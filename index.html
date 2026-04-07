@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pomodoro Minimal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/remixicon@4.5.0/fonts/remixicon.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="head">
+        <p class="kicker">Focus</p>
+        <h1>Pomodoro</h1>
+      </header>
+
+      <section class="timer-card" aria-live="polite">
+        <div class="timer-head">
+          <p id="modeLabel" class="mode">Focus Session</p>
+          <div class="timer-icons">
+            <button id="settingsBtn" class="btn icon-btn" type="button" aria-label="Show timer settings" title="Show timer settings" aria-expanded="false">
+              <i class="ri-settings-3-line" aria-hidden="true"></i>
+            </button>
+            <button id="pipBtn" class="btn icon-btn" type="button" aria-label="Enter Picture-in-Picture" title="Enter Picture-in-Picture">
+              <i class="ri-picture-in-picture-2-line" aria-hidden="true"></i>
+            </button>
+            <button id="resetBtn" class="btn icon-btn" type="button" aria-label="Reset timer" title="Reset timer">
+              <i class="ri-restart-line" aria-hidden="true"></i>
+            </button>
+            <button id="muteBtn" class="btn icon-btn" type="button" aria-pressed="false" aria-label="Mute alarm" title="Mute alarm">
+              <i id="muteIcon" class="ri-volume-up-line" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+        <p id="timeDisplay" class="time">25:00</p>
+        <div class="progress-shell" role="presentation">
+          <div id="progressBar" class="progress-bar"></div>
+        </div>
+      </section>
+
+      <section class="actions" aria-label="Timer actions">
+        <div class="transport" aria-label="Playback controls">
+          <button id="rewind10Btn" class="btn media-btn media-btn-seek" type="button" aria-label="Rewind 10 seconds" title="Rewind 10 seconds">
+            <i class="ri-rewind-mini-line" aria-hidden="true"></i>
+            <span class="seek-label" aria-hidden="true">10</span>
+          </button>
+          <button id="prevTimerBtn" class="btn media-btn" type="button" aria-label="Previous timer" title="Previous timer">
+            <i class="ri-skip-back-mini-line" aria-hidden="true"></i>
+          </button>
+          <button id="startPauseBtn" class="btn btn-primary media-btn media-btn-main" type="button" aria-label="Start timer" title="Start timer">
+            <i id="startPauseIcon" class="ri-play-fill" aria-hidden="true"></i>
+          </button>
+          <button id="nextTimerBtn" class="btn media-btn" type="button" aria-label="Next timer" title="Next timer">
+            <i class="ri-skip-forward-mini-line" aria-hidden="true"></i>
+          </button>
+          <button id="forward10Btn" class="btn media-btn media-btn-seek" type="button" aria-label="Forward 10 seconds" title="Forward 10 seconds">
+            <i class="ri-speed-mini-line" aria-hidden="true"></i>
+            <span class="seek-label" aria-hidden="true">10</span>
+          </button>
+        </div>
+      </section>
+
+      <section id="settingsPanel" class="settings-panel" hidden>
+        <section class="settings" aria-label="Timer settings">
+          <label>
+            Focus (min)
+            <input id="workMinutes" type="number" min="1" max="120" value="25" />
+          </label>
+          <label>
+            Short Break (min)
+            <input id="shortBreakMinutes" type="number" min="1" max="60" value="5" />
+          </label>
+          <label>
+            Long Break (min)
+            <input id="longBreakMinutes" type="number" min="1" max="120" value="15" />
+          </label>
+          <div class="theme-field" role="group" aria-label="Background theme">
+            <span class="theme-label">Background Theme</span>
+            <div class="theme-buttons">
+              <button id="themeSolidBtn" class="btn theme-btn" type="button" data-theme="solid" aria-pressed="true">Solid</button>
+              <button id="themePlanetsBtn" class="btn theme-btn" type="button" data-theme="planets" aria-pressed="false">Planets</button>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <p id="supportHint" class="hint"></p>
+    </main>
+
+    <video id="pipVideo" playsinline controls hidden></video>
+    <canvas id="pipCanvas" width="640" height="360" hidden></canvas>
+
+    <script src="app.js"></script>
+  </body>
+</html>
