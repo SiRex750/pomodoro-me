@@ -32,9 +32,9 @@ const SESSION_VIDEO_SOURCES = {
 };
 
 const PLANET_IMAGES = {
-  focus: "https://upload.wikimedia.org/wikipedia/commons/0/02/OSIRIS_Mars_true_color.jpg",
-  shortBreak: "https://upload.wikimedia.org/wikipedia/commons/3/3d/Uranus2.jpg",
-  longBreak: "https://upload.wikimedia.org/wikipedia/commons/5/56/Neptune_Full.jpg",
+  focus: "assets/planets-focus.jpg",
+  shortBreak: "assets/planets-short-break.jpg",
+  longBreak: "assets/planets-long-break.jpg",
 };
 
 const MARBLE_IMAGES = {

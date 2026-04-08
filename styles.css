@@ -211,6 +211,7 @@ label {
   gap: 0.5rem;
   color: var(--ink-soft);
   font-size: 0.9rem;
+  grid-column: 1 / -1;
 }
 
 .theme-label {
@@ -225,8 +226,13 @@ label {
 
 .theme-btn {
   width: 100%;
+  min-height: 40px;
   padding: 0.55rem 0.5rem;
   border-radius: 999px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .theme-btn.is-active {
@@ -369,7 +375,7 @@ body[data-bgset="solid"] {
 }
 
 body[data-bgset="planets"][data-session="focus"] {
-  --bg-image: url("https://upload.wikimedia.org/wikipedia/commons/0/02/OSIRIS_Mars_true_color.jpg");
+  --bg-image: url("assets/planets-focus.jpg");
   --bg-overlay: rgba(70, 18, 28, 0.5);
   --card: rgba(46, 22, 27, 0.76);
   --panel: rgba(68, 31, 37, 0.78);
@@ -380,7 +386,7 @@ body[data-bgset="planets"][data-session="focus"] {
 }
 
 body[data-bgset="planets"][data-session="shortBreak"] {
-  --bg-image: url("https://upload.wikimedia.org/wikipedia/commons/3/3d/Uranus2.jpg");
+  --bg-image: url("assets/planets-short-break.jpg");
   --bg-overlay: rgba(12, 64, 80, 0.46);
   --card: rgba(18, 77, 96, 0.72);
   --panel: rgba(26, 98, 121, 0.74);
@@ -391,7 +397,7 @@ body[data-bgset="planets"][data-session="shortBreak"] {
 }
 
 body[data-bgset="planets"][data-session="longBreak"] {
-  --bg-image: url("https://upload.wikimedia.org/wikipedia/commons/5/56/Neptune_Full.jpg");
+  --bg-image: url("assets/planets-long-break.jpg");
   --bg-overlay: rgba(9, 31, 66, 0.52);
   --card: rgba(18, 49, 94, 0.74);
   --panel: rgba(21, 66, 119, 0.76);
