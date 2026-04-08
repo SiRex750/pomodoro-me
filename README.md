@@ -53,11 +53,19 @@ This repo is configured for Vercel with static frontend + serverless API routes.
 
 1. Push this repo to GitHub.
 2. Open Vercel and click `Add New...` -> `Project`.
-3. Import `SiRex750/pomodoro-me`.
+3. Import your repository.
 4. Keep defaults (Framework Preset: `Other`).
 5. Click `Deploy`.
 
 After deploy you will get a public URL like `https://your-project.vercel.app`.
+
+CLI option:
+
+```bash
+npm i -g vercel
+vercel
+vercel --prod
+```
 
 ## Connect Your Domain
 
