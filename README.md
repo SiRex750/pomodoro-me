@@ -1,6 +1,6 @@
 # Pomodoro Me
 
-A minimalist Pomodoro timer with Picture-in-Picture support, theme backgrounds, and a backend-ready Node deployment setup.
+A minimalist Pomodoro timer with Picture-in-Picture support, theme backgrounds, and backend-ready deployment on Vercel.
 
 ## Features
 
@@ -8,15 +8,16 @@ A minimalist Pomodoro timer with Picture-in-Picture support, theme backgrounds, 
 - PiP workflow with video/canvas fallback behavior
 - Theme support: Solid, Planets, Marble
 - Local assets support (works without internet for backgrounds)
-- Backend-ready server (`Express`) for future LLM/API endpoints
+- Backend-ready API routes for future LLM/API endpoints
 
 ## Project Structure
 
 - `index.html` - UI structure
 - `styles.css` - styling and themes
 - `app.js` - timer + PiP + UI interactions
-- `server.js` - production server and API entry point
-- `render.yaml` - one-click Render deployment config
+- `server.js` - local Node server for development
+- `api/health.js` - Vercel serverless API example route
+- `vercel.json` - Vercel routing/runtime config
 
 ## Local Development
 
@@ -46,29 +47,31 @@ For smoother PiP, place these files in `assets/`:
 
 If they are missing, the app falls back to canvas rendering.
 
-## Deploy Online (Backend-Ready)
+## Deploy Online With Vercel
 
-This repo is configured for Render, which supports both frontend and backend logic.
+This repo is configured for Vercel with static frontend + serverless API routes.
 
-1. Push repo to GitHub.
-2. In Render, choose `New +` -> `Blueprint`.
-3. Select this repository.
-4. Render reads `render.yaml` and creates the web service automatically.
-5. Your app goes live on a public URL.
+1. Push this repo to GitHub.
+2. Open Vercel and click `Add New...` -> `Project`.
+3. Import `SiRex750/pomodoro-me`.
+4. Keep defaults (Framework Preset: `Other`).
+5. Click `Deploy`.
+
+After deploy you will get a public URL like `https://your-project.vercel.app`.
 
 ## Connect Your Domain
 
-After deploy:
+After deploy on Vercel:
 
-1. Open your Render service.
-2. Go to `Settings` -> `Custom Domains`.
+1. Open your Vercel project.
+2. Go to `Settings` -> `Domains`.
 3. Add your domain (for example `pomodoro.yourdomain.com`).
-4. Add the DNS record Render shows (usually a CNAME).
+4. Add the DNS record Vercel shows (usually a CNAME for subdomains).
 5. Wait for DNS propagation and SSL issuance.
 
 ## Future Backend / LLM Integration
 
-Use `server.js` routes under `/api` for backend logic.
+Use files under `api/` for backend logic on Vercel.
 
 Example health endpoint already included:
 
