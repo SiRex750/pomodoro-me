@@ -218,13 +218,14 @@ label {
 }
 
 .theme-buttons {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.5rem;
-  flex-wrap: wrap;
 }
 
 .theme-btn {
-  padding: 0.55rem 0.85rem;
+  width: 100%;
+  padding: 0.55rem 0.5rem;
   border-radius: 999px;
 }
 
