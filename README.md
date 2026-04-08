@@ -1,6 +1,6 @@
 # Pomodoro Me
 
-A minimalist Pomodoro timer with Picture-in-Picture support, theme backgrounds, and backend-ready deployment on Vercel.
+A minimalist Pomodoro timer with Picture-in-Picture support, theme backgrounds, and static deployment on Vercel.
 
 ## Features
 
@@ -8,16 +8,14 @@ A minimalist Pomodoro timer with Picture-in-Picture support, theme backgrounds, 
 - PiP workflow with video/canvas fallback behavior
 - Theme support: Solid, Planets, Marble
 - Local assets support (works without internet for backgrounds)
-- Backend-ready API routes for future LLM/API endpoints
+- Optional serverless API route support on Vercel
 
 ## Project Structure
 
 - `index.html` - UI structure
 - `styles.css` - styling and themes
 - `app.js` - timer + PiP + UI interactions
-- `server.js` - local Node server for development
 - `api/health.js` - Vercel serverless API example route
-- `vercel.json` - Vercel routing/runtime config
 
 ## Local Development
 
@@ -49,7 +47,7 @@ If they are missing, the app falls back to canvas rendering.
 
 ## Deploy Online With Vercel
 
-This repo is configured for Vercel with static frontend + serverless API routes.
+This repo is configured for Vercel static hosting + optional serverless API routes.
 
 1. Push this repo to GitHub.
 2. Open Vercel and click `Add New...` -> `Project`.

@@ -2,16 +2,15 @@
   "name": "pomodoro-me",
   "version": "1.0.0",
   "private": true,
-  "description": "Pomodoro timer with PiP and backend-ready hosting",
-  "main": "server.js",
+  "description": "Pomodoro timer with PiP and static hosting",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "serve -l 3000 .",
+    "dev": "serve -l 3000 ."
   },
   "engines": {
     "node": "20.x"
   },
   "dependencies": {
-    "express": "^4.19.2"
+    "serve": "^14.2.4"
   }
 }
