@@ -220,6 +220,7 @@ label {
 .theme-buttons {
   display: flex;
   gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .theme-btn {
@@ -397,6 +398,39 @@ body[data-bgset="planets"][data-session="longBreak"] {
   --ink-soft: #cadef8;
   --line: rgba(179, 206, 246, 0.36);
   --btn-bg: rgba(32, 80, 146, 0.78);
+}
+
+body[data-bgset="marble"][data-session="focus"] {
+  --bg-image: url("assets/marble-focus.jpg");
+  --bg-overlay: rgba(34, 7, 6, 0.54);
+  --card: rgba(58, 15, 14, 0.78);
+  --panel: rgba(77, 20, 19, 0.8);
+  --ink: #ffeceb;
+  --ink-soft: #f3cecc;
+  --line: rgba(250, 192, 187, 0.38);
+  --btn-bg: rgba(97, 29, 28, 0.82);
+}
+
+body[data-bgset="marble"][data-session="shortBreak"] {
+  --bg-image: url("assets/marble-short-break.jpg");
+  --bg-overlay: rgba(8, 40, 46, 0.46);
+  --card: rgba(12, 61, 68, 0.76);
+  --panel: rgba(16, 82, 92, 0.78);
+  --ink: #ecfdff;
+  --ink-soft: #c7ecef;
+  --line: rgba(173, 231, 235, 0.36);
+  --btn-bg: rgba(18, 98, 110, 0.82);
+}
+
+body[data-bgset="marble"][data-session="longBreak"] {
+  --bg-image: url("assets/marble-long-break.jpg");
+  --bg-overlay: rgba(3, 11, 21, 0.58);
+  --card: rgba(6, 24, 40, 0.76);
+  --panel: rgba(8, 35, 59, 0.78);
+  --ink: #eaf7ff;
+  --ink-soft: #b9dced;
+  --line: rgba(144, 199, 230, 0.34);
+  --btn-bg: rgba(10, 49, 84, 0.84);
 }
 
 .btn-primary {

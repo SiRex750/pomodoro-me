@@ -18,6 +18,7 @@ const shortBreakMinutesInput = document.getElementById("shortBreakMinutes");
 const longBreakMinutesInput = document.getElementById("longBreakMinutes");
 const themeSolidBtn = document.getElementById("themeSolidBtn");
 const themePlanetsBtn = document.getElementById("themePlanetsBtn");
+const themeMarbleBtn = document.getElementById("themeMarbleBtn");
 const supportHint = document.getElementById("supportHint");
 
 const pipVideo = document.getElementById("pipVideo");
@@ -33,15 +34,31 @@ const SESSION_VIDEO_SOURCES = {
 const PLANET_IMAGES = {
   focus: "https://upload.wikimedia.org/wikipedia/commons/0/02/OSIRIS_Mars_true_color.jpg",
   shortBreak: "https://upload.wikimedia.org/wikipedia/commons/3/3d/Uranus2.jpg",
-  longBreak: "https://upload.wikimedia.org/wikipedia/commons/5/56/Neptune_Full.jpg"
+  longBreak: "https://upload.wikimedia.org/wikipedia/commons/5/56/Neptune_Full.jpg",
+};
+
+const MARBLE_IMAGES = {
+  focus: "assets/marble-focus.jpg",
+  shortBreak: "assets/marble-short-break.jpg",
+  longBreak: "assets/marble-long-break.jpg",
+};
+
+const THEME_IMAGE_SETS = {
+  planets: PLANET_IMAGES,
+  marble: MARBLE_IMAGES,
 };
 
 const loadedImages = {};
-for (const [key, url] of Object.entries(PLANET_IMAGES)) {
-  const img = new Image();
-  img.crossOrigin = "anonymous";
-  img.src = url;
-  loadedImages[key] = img;
+for (const [themeName, imageMap] of Object.entries(THEME_IMAGE_SETS)) {
+  loadedImages[themeName] = {};
+  for (const [modeKey, url] of Object.entries(imageMap)) {
+    const img = new Image();
+    if (themeName === "planets") {
+      img.crossOrigin = "anonymous";
+    }
+    img.src = url;
+    loadedImages[themeName][modeKey] = img;
+  }
 }
 
 const state = {
@@ -163,13 +180,15 @@ async function isVideoSourceAvailable(source) {
 }
 
 function setBackgroundTheme(theme) {
-  const nextTheme = ["solid", "planets"].includes(theme) ? theme : "solid";
+  const nextTheme = ["solid", "planets", "marble"].includes(theme) ? theme : "solid";
   state.backgroundTheme = nextTheme;
   document.body.dataset.bgset = nextTheme;
   themeSolidBtn.classList.toggle("is-active", nextTheme === "solid");
   themePlanetsBtn.classList.toggle("is-active", nextTheme === "planets");
+  themeMarbleBtn.classList.toggle("is-active", nextTheme === "marble");
   themeSolidBtn.setAttribute("aria-pressed", nextTheme === "solid" ? "true" : "false");
   themePlanetsBtn.setAttribute("aria-pressed", nextTheme === "planets" ? "true" : "false");
+  themeMarbleBtn.setAttribute("aria-pressed", nextTheme === "marble" ? "true" : "false");
   localStorage.setItem("pomodoroBackgroundTheme", nextTheme);
 }
 
@@ -325,8 +344,9 @@ function renderPiPFrame() {
   pipCtx.fillStyle = colors.bg;
   pipCtx.fillRect(0, 0, w, h);
 
-  if (state.backgroundTheme === "planets" && loadedImages[state.mode].complete) {
-    const img = loadedImages[state.mode];
+  const activeImageSet = loadedImages[state.backgroundTheme];
+  if (activeImageSet && activeImageSet[state.mode] && activeImageSet[state.mode].complete) {
+    const img = activeImageSet[state.mode];
     const imgRatio = img.width / img.height;
     const canvasRatio = w / h;
     let drawW = w;
@@ -756,6 +776,7 @@ shortBreakMinutesInput.addEventListener("change", () => applySettings(!state.run
 longBreakMinutesInput.addEventListener("change", () => applySettings(!state.running));
 themeSolidBtn.addEventListener("click", () => setBackgroundTheme("solid"));
 themePlanetsBtn.addEventListener("click", () => setBackgroundTheme("planets"));
+themeMarbleBtn.addEventListener("click", () => setBackgroundTheme("marble"));
 
 pipVideo.addEventListener("play", () => {
   if (!state.suppressVideoEvents) {
