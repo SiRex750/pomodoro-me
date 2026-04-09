@@ -22,13 +22,16 @@ const themeMarbleBtn = document.getElementById("themeMarbleBtn");
 const supportHint = document.getElementById("supportHint");
 const focusSessionsCount = document.getElementById("focusSessionsCount");
 const totalPomodoroTime = document.getElementById("totalPomodoroTime");
-const todayStats = document.getElementById("todayStats");
-const weeklyStats = document.getElementById("weeklyStats");
-const weeklyBreakdown = document.getElementById("weeklyBreakdown");
-const authStatus = document.getElementById("authStatus");
+const sessionsStatLabel = document.getElementById("sessionsStatLabel");
+const timeStatLabel = document.getElementById("timeStatLabel");
+const todayStatsBtn = document.getElementById("todayStatsBtn");
+const weeklyStatsBtn = document.getElementById("weeklyStatsBtn");
+const lifetimeStatsBtn = document.getElementById("lifetimeStatsBtn");
+const resetLifetimeBtn = document.getElementById("resetLifetimeBtn");
 const googleSignInBtn = document.getElementById("googleSignInBtn");
 const signOutBtn = document.getElementById("signOutBtn");
-const resetLifetimeBtn = document.getElementById("resetLifetimeBtn");
+const authStatus = document.getElementById("authStatus");
+const cloudSyncStatus = document.getElementById("cloudSyncStatus");
 
 const pipVideo = document.getElementById("pipVideo");
 const pipCanvas = document.getElementById("pipCanvas");
@@ -59,7 +62,9 @@ const THEME_IMAGE_SETS = {
 
 const USAGE_STATS_KEY = "pomodoroUsageStatsV1";
 const PIP_STICKY_KEY = "pomodoroPiPStickyV1";
-const FIREBASE_SYNC_DOC = "stats";
+const STATS_RANGE_KEY = "pomodoroStatsRangeV1";
+const STATS_DOC_VERSION = 1;
+const CLOUD_SYNC_DEBOUNCE_MS = 1200;
 
 const loadedImages = {};
 for (const [themeName, imageMap] of Object.entries(THEME_IMAGE_SETS)) {
@@ -100,16 +105,71 @@ const state = {
   lastTrackedAtMs: null,
   lifetimeFocusSessions: 0,
   lifetimePomodoroMs: 0,
-  dailyStats: {},
-  statsUpdatedAt: 0,
   unsavedUsageMs: 0,
-  authUser: null,
+  statsRange: "today",
+  statsByDay: {},
+  usageLastUpdatedAt: 0,
+  authReady: false,
   firebaseReady: false,
   firebaseAuth: null,
   firebaseDb: null,
-  cloudSyncInProgress: false,
+  currentUser: null,
+  cloudSyncTimer: null,
+  cloudSyncInFlight: false,
   lastCloudSyncAt: 0,
 };
+
+function todayKey() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getRecentDayKeys(count) {
+  const keys = [];
+  const dayMs = 24 * 60 * 60 * 1000;
+  const now = new Date();
+  const base = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+  for (let i = 0; i < count; i += 1) {
+    const current = new Date(base - i * dayMs);
+    const year = current.getFullYear();
+    const month = String(current.getMonth() + 1).padStart(2, "0");
+    const day = String(current.getDate()).padStart(2, "0");
+    keys.push(`${year}-${month}-${day}`);
+  }
+
+  return keys;
+}
+
+function normalizeStatsByDay(input) {
+  if (!input || typeof input !== "object") {
+    return {};
+  }
+
+  const next = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(key) || !value || typeof value !== "object") {
+      continue;
+    }
+
+    next[key] = {
+      focusSessions: Number.isFinite(value.focusSessions) ? Math.max(0, Math.floor(value.focusSessions)) : 0,
+      pomodoroMs: Number.isFinite(value.pomodoroMs) ? Math.max(0, Math.floor(value.pomodoroMs)) : 0,
+    };
+  }
+
+  return next;
+}
+
+function ensureTodayStatsBucket() {
+  const key = todayKey();
+  if (!state.statsByDay[key]) {
+    state.statsByDay[key] = { focusSessions: 0, pomodoroMs: 0 };
+  }
+}
 
 function formatTrackedDuration(totalMs) {
   const totalSeconds = Math.floor(Math.max(0, totalMs) / 1000);
@@ -125,117 +185,55 @@ function formatTrackedDuration(totalMs) {
   return `${hours}:${mins}:${secs}`;
 }
 
-function formatDayLabel(dateKey) {
-  const parts = dateKey.split("-");
-  if (parts.length !== 3) {
-    return dateKey;
-  }
-
-  const dt = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-  return dt.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-}
-
-function todayKey() {
-  return new Date().toLocaleDateString("en-CA");
-}
-
-function getRecentDayKeys(daysCount) {
-  const keys = [];
-  const now = new Date();
-
-  for (let i = daysCount - 1; i >= 0; i -= 1) {
-    const d = new Date(now);
-    d.setDate(now.getDate() - i);
-    keys.push(d.toLocaleDateString("en-CA"));
-  }
-
-  return keys;
-}
-
-function ensureDayStats(dayKey) {
-  if (!state.dailyStats[dayKey]) {
-    state.dailyStats[dayKey] = {
-      sessions: 0,
-      pomodoroMs: 0,
-    };
-  }
-
-  return state.dailyStats[dayKey];
-}
-
-function markStatsUpdated() {
-  state.statsUpdatedAt = Date.now();
-}
-
-function normalizeDailyStats(rawDailyStats) {
-  const normalized = {};
-
-  if (!rawDailyStats || typeof rawDailyStats !== "object") {
-    return normalized;
-  }
-
-  for (const [dayKey, stat] of Object.entries(rawDailyStats)) {
-    const sessions = Number.isFinite(stat?.sessions) ? Math.max(0, Math.floor(stat.sessions)) : 0;
-    const pomodoroMs = Number.isFinite(stat?.pomodoroMs) ? Math.max(0, Math.floor(stat.pomodoroMs)) : 0;
-    if (sessions > 0 || pomodoroMs > 0) {
-      normalized[dayKey] = { sessions, pomodoroMs };
-    }
-  }
-
-  return normalized;
-}
-
-function normalizeStatsPayload(raw) {
-  const stats = raw || {};
-  return {
-    lifetimeFocusSessions: Number.isFinite(stats.lifetimeFocusSessions)
-      ? Math.max(0, Math.floor(stats.lifetimeFocusSessions))
-      : 0,
-    lifetimePomodoroMs: Number.isFinite(stats.lifetimePomodoroMs)
-      ? Math.max(0, Math.floor(stats.lifetimePomodoroMs))
-      : 0,
-    dailyStats: normalizeDailyStats(stats.dailyStats),
-    statsUpdatedAt: Number.isFinite(stats.statsUpdatedAt) ? Math.floor(stats.statsUpdatedAt) : 0,
-  };
-}
-
-function applyStatsPayload(payload) {
-  state.lifetimeFocusSessions = payload.lifetimeFocusSessions;
-  state.lifetimePomodoroMs = payload.lifetimePomodoroMs;
-  state.dailyStats = payload.dailyStats;
-  state.statsUpdatedAt = payload.statsUpdatedAt;
-}
-
 function loadUsageStats() {
   try {
     const raw = localStorage.getItem(USAGE_STATS_KEY);
     if (!raw) {
+      ensureTodayStatsBucket();
       return;
     }
 
-    const parsed = normalizeStatsPayload(JSON.parse(raw));
-    applyStatsPayload(parsed);
+    const parsed = JSON.parse(raw);
+    state.lifetimeFocusSessions = Number.isFinite(parsed.lifetimeFocusSessions)
+      ? Math.max(0, Math.floor(parsed.lifetimeFocusSessions))
+      : 0;
+    state.lifetimePomodoroMs = Number.isFinite(parsed.lifetimePomodoroMs)
+      ? Math.max(0, Math.floor(parsed.lifetimePomodoroMs))
+      : 0;
+    state.statsByDay = normalizeStatsByDay(parsed.statsByDay);
+    state.usageLastUpdatedAt = Number.isFinite(parsed.updatedAt)
+      ? Math.max(0, Math.floor(parsed.updatedAt))
+      : 0;
+    ensureTodayStatsBucket();
   } catch (error) {
-    applyStatsPayload(normalizeStatsPayload({}));
+    state.lifetimeFocusSessions = 0;
+    state.lifetimePomodoroMs = 0;
+    state.statsByDay = {};
+    state.usageLastUpdatedAt = 0;
+    ensureTodayStatsBucket();
+  }
+}
+
+function loadStatsRangePreference() {
+  const saved = localStorage.getItem(STATS_RANGE_KEY);
+  if (["today", "weekly", "lifetime"].includes(saved)) {
+    state.statsRange = saved;
   }
 }
 
 function saveUsageStats() {
-  if (!state.statsUpdatedAt) {
-    markStatsUpdated();
-  }
-
+  state.usageLastUpdatedAt = Date.now();
   localStorage.setItem(
     USAGE_STATS_KEY,
     JSON.stringify({
       lifetimeFocusSessions: state.lifetimeFocusSessions,
       lifetimePomodoroMs: Math.floor(state.lifetimePomodoroMs),
-      dailyStats: state.dailyStats,
-      statsUpdatedAt: state.statsUpdatedAt,
+      statsByDay: state.statsByDay,
+      updatedAt: state.usageLastUpdatedAt,
     })
   );
   state.unsavedUsageMs = 0;
-  syncStatsToCloud();
+  scheduleCloudSync();
 }
 
 function loadPiPStickyPreference() {
@@ -247,6 +245,57 @@ function setPiPStickyPreference(value) {
   localStorage.setItem(PIP_STICKY_KEY, value ? "1" : "0");
 }
 
+function setStatsRange(range) {
+  if (!["today", "weekly", "lifetime"].includes(range)) {
+    return;
+  }
+
+  state.statsRange = range;
+  localStorage.setItem(STATS_RANGE_KEY, range);
+  updateUI();
+}
+
+function aggregateStats(range) {
+  if (range === "lifetime") {
+    return {
+      sessions: state.lifetimeFocusSessions,
+      pomodoroMs: state.lifetimePomodoroMs,
+      sessionsLabel: "Lifetime Focus Sessions",
+      timeLabel: "Lifetime Pomodoro Time",
+    };
+  }
+
+  if (range === "weekly") {
+    const keys = getRecentDayKeys(7);
+    let sessions = 0;
+    let pomodoroMs = 0;
+    for (const key of keys) {
+      const bucket = state.statsByDay[key];
+      if (!bucket) {
+        continue;
+      }
+
+      sessions += bucket.focusSessions;
+      pomodoroMs += bucket.pomodoroMs;
+    }
+
+    return {
+      sessions,
+      pomodoroMs,
+      sessionsLabel: "Weekly Focus Sessions",
+      timeLabel: "Weekly Pomodoro Time",
+    };
+  }
+
+  const bucket = state.statsByDay[todayKey()] || { focusSessions: 0, pomodoroMs: 0 };
+  return {
+    sessions: bucket.focusSessions,
+    pomodoroMs: bucket.pomodoroMs,
+    sessionsLabel: "Today Focus Sessions",
+    timeLabel: "Today Pomodoro Time",
+  };
+}
+
 function addUsageElapsed(nowMs = Date.now()) {
   if (!state.running || !state.lastTrackedAtMs) {
     return;
@@ -255,9 +304,8 @@ function addUsageElapsed(nowMs = Date.now()) {
   const delta = Math.max(0, nowMs - state.lastTrackedAtMs);
   state.lastTrackedAtMs = nowMs;
   state.lifetimePomodoroMs += delta;
-  const today = ensureDayStats(todayKey());
-  today.pomodoroMs += delta;
-  markStatsUpdated();
+  ensureTodayStatsBucket();
+  state.statsByDay[todayKey()].pomodoroMs += delta;
   state.unsavedUsageMs += delta;
 
   if (state.unsavedUsageMs >= 5000) {
@@ -301,214 +349,173 @@ async function keepPiPOnTop() {
 }
 
 function isFirefoxBrowser() {
-  return navigator.userAgent.toLowerCase().includes("firefox");
-}
-
-function getTodayStats() {
-  const today = ensureDayStats(todayKey());
-  return {
-    sessions: today.sessions,
-    pomodoroMs: today.pomodoroMs,
-  };
-}
-
-function getWeeklyStats() {
-  const weekKeys = getRecentDayKeys(7);
-  let sessions = 0;
-  let pomodoroMs = 0;
-
-  for (const key of weekKeys) {
-    const dayStats = state.dailyStats[key];
-    sessions += dayStats?.sessions || 0;
-    pomodoroMs += dayStats?.pomodoroMs || 0;
-  }
-
-  return { sessions, pomodoroMs, weekKeys };
-}
-
-function renderWeeklyBreakdown() {
-  const weekKeys = getRecentDayKeys(7);
-  weeklyBreakdown.innerHTML = "";
-
-  for (const key of weekKeys) {
-    const dayStats = state.dailyStats[key] || { sessions: 0, pomodoroMs: 0 };
-    const row = document.createElement("p");
-    row.className = "weekly-row";
-    row.textContent = `${formatDayLabel(key)}: ${dayStats.sessions} sessions - ${formatTrackedDuration(dayStats.pomodoroMs)}`;
-    weeklyBreakdown.appendChild(row);
-  }
-}
-
-function updateAuthUI(message) {
-  if (message) {
-    authStatus.textContent = message;
-  } else if (state.authUser) {
-    authStatus.textContent = `Signed in as ${state.authUser.displayName || state.authUser.email || "Google user"}`;
-  } else if (state.firebaseReady) {
-    authStatus.textContent = "Not signed in";
-  } else {
-    authStatus.textContent = "Cloud sync unavailable until Firebase config is set";
-  }
-
-  googleSignInBtn.hidden = !state.firebaseReady || Boolean(state.authUser);
-  signOutBtn.hidden = !state.firebaseReady || !state.authUser;
-}
-
-function buildStatsPayload() {
-  return {
-    lifetimeFocusSessions: state.lifetimeFocusSessions,
-    lifetimePomodoroMs: Math.floor(state.lifetimePomodoroMs),
-    dailyStats: state.dailyStats,
-    statsUpdatedAt: state.statsUpdatedAt,
-    updatedAtIso: new Date(state.statsUpdatedAt || Date.now()).toISOString(),
-  };
-}
-
-async function writeStatsToCloud(force = false) {
-  if (!state.firebaseReady || !state.firebaseDb || !state.authUser) {
-    return;
-  }
-
-  if (state.cloudSyncInProgress) {
-    return;
-  }
-
-  const now = Date.now();
-  if (!force && now - state.lastCloudSyncAt < 12000) {
-    return;
-  }
-
-  state.cloudSyncInProgress = true;
-  try {
-    const payload = buildStatsPayload();
-    await state.firebaseDb
-      .collection("pomodoroUsers")
-      .doc(state.authUser.uid)
-      .collection("stats")
-      .doc(FIREBASE_SYNC_DOC)
-      .set(payload, { merge: true });
-    state.lastCloudSyncAt = now;
-    updateAuthUI("Cloud synced");
-  } catch (error) {
-    updateAuthUI("Cloud sync failed. Stats still saved locally.");
-  } finally {
-    state.cloudSyncInProgress = false;
-  }
-}
-
-function syncStatsToCloud(force = false) {
-  writeStatsToCloud(force);
-}
-
-async function pullOrMergeCloudStats(user) {
-  if (!state.firebaseDb) {
-    return;
-  }
-
-  const docRef = state.firebaseDb
-    .collection("pomodoroUsers")
-    .doc(user.uid)
-    .collection("stats")
-    .doc(FIREBASE_SYNC_DOC);
-
-  const snapshot = await docRef.get();
-  if (!snapshot.exists) {
-    await writeStatsToCloud(true);
-    return;
-  }
-
-  const remoteStats = normalizeStatsPayload(snapshot.data());
-  const localStats = normalizeStatsPayload(buildStatsPayload());
-
-  if (remoteStats.statsUpdatedAt > localStats.statsUpdatedAt) {
-    applyStatsPayload(remoteStats);
-    saveUsageStats();
-    updateUI();
-    updateAuthUI("Loaded cloud stats");
-  } else {
-    await writeStatsToCloud(true);
-  }
+  return /firefox/i.test(navigator.userAgent || "");
 }
 
 function hasFirebaseConfig() {
-  const cfg = window.POMODORO_FIREBASE_CONFIG;
-  return Boolean(cfg && typeof cfg === "object" && cfg.apiKey && cfg.projectId && cfg.appId);
+  const config = window.POMODORO_FIREBASE_CONFIG;
+  if (!config || typeof config !== "object") {
+    return false;
+  }
+
+  return Boolean(config.apiKey && config.projectId && config.appId);
+}
+
+function updateAuthUI() {
+  if (!state.firebaseReady) {
+    authStatus.textContent = "Local mode (Firebase not configured yet)";
+    googleSignInBtn.disabled = true;
+    signOutBtn.hidden = true;
+    return;
+  }
+
+  if (!state.currentUser) {
+    authStatus.textContent = "Local mode (not signed in)";
+    googleSignInBtn.disabled = false;
+    googleSignInBtn.hidden = false;
+    signOutBtn.hidden = true;
+    return;
+  }
+
+  authStatus.textContent = `Signed in as ${state.currentUser.displayName || state.currentUser.email || "Google user"}`;
+  googleSignInBtn.hidden = true;
+  signOutBtn.hidden = false;
+}
+
+function setCloudSyncStatus(message) {
+  cloudSyncStatus.textContent = message;
+}
+
+async function pullStatsFromCloud() {
+  if (!state.firebaseDb || !state.currentUser) {
+    return;
+  }
+
+  const docRef = state.firebaseDb.collection("pomodoroUsers").doc(state.currentUser.uid);
+  const snapshot = await docRef.get();
+  if (!snapshot.exists) {
+    setCloudSyncStatus("Cloud ready. First sync will create your stats profile.");
+    return;
+  }
+
+  const data = snapshot.data() || {};
+  const remoteUpdatedAt = Number.isFinite(data.updatedAt) ? Math.max(0, Math.floor(data.updatedAt)) : 0;
+  if (remoteUpdatedAt <= state.usageLastUpdatedAt) {
+    setCloudSyncStatus("Cloud connected. Using your latest local stats.");
+    return;
+  }
+
+  state.lifetimeFocusSessions = Number.isFinite(data.lifetimeFocusSessions)
+    ? Math.max(0, Math.floor(data.lifetimeFocusSessions))
+    : state.lifetimeFocusSessions;
+  state.lifetimePomodoroMs = Number.isFinite(data.lifetimePomodoroMs)
+    ? Math.max(0, Math.floor(data.lifetimePomodoroMs))
+    : state.lifetimePomodoroMs;
+  state.statsByDay = normalizeStatsByDay(data.statsByDay);
+  state.usageLastUpdatedAt = remoteUpdatedAt;
+  ensureTodayStatsBucket();
+  saveUsageStats();
+  updateUI();
+  setCloudSyncStatus("Stats loaded from cloud.");
+}
+
+async function pushStatsToCloud() {
+  if (!state.firebaseDb || !state.currentUser || state.cloudSyncInFlight) {
+    return;
+  }
+
+  state.cloudSyncInFlight = true;
+  try {
+    const payload = {
+      version: STATS_DOC_VERSION,
+      uid: state.currentUser.uid,
+      email: state.currentUser.email || "",
+      lifetimeFocusSessions: state.lifetimeFocusSessions,
+      lifetimePomodoroMs: Math.floor(state.lifetimePomodoroMs),
+      statsByDay: state.statsByDay,
+      updatedAt: state.usageLastUpdatedAt || Date.now(),
+    };
+
+    await state.firebaseDb.collection("pomodoroUsers").doc(state.currentUser.uid).set(payload, { merge: true });
+    state.lastCloudSyncAt = Date.now();
+    setCloudSyncStatus("Synced to cloud.");
+  } catch (error) {
+    setCloudSyncStatus("Cloud sync failed. Will retry on next update.");
+  } finally {
+    state.cloudSyncInFlight = false;
+  }
+}
+
+function scheduleCloudSync(immediate = false) {
+  if (!state.currentUser || !state.firebaseDb) {
+    return;
+  }
+
+  if (state.cloudSyncTimer) {
+    clearTimeout(state.cloudSyncTimer);
+  }
+
+  state.cloudSyncTimer = setTimeout(
+    () => {
+      state.cloudSyncTimer = null;
+      pushStatsToCloud();
+    },
+    immediate ? 50 : CLOUD_SYNC_DEBOUNCE_MS
+  );
+}
+
+async function signInWithGoogle() {
+  if (!state.firebaseAuth) {
+    return;
+  }
+
+  const provider = new firebase.auth.GoogleAuthProvider();
+  await state.firebaseAuth.signInWithPopup(provider);
+}
+
+async function signOutGoogle() {
+  if (!state.firebaseAuth) {
+    return;
+  }
+
+  await state.firebaseAuth.signOut();
 }
 
 function setupFirebaseAuth() {
-  if (!window.firebase || !hasFirebaseConfig()) {
+  if (typeof firebase === "undefined" || !hasFirebaseConfig()) {
     state.firebaseReady = false;
     updateAuthUI();
     return;
   }
 
-  const config = window.POMODORO_FIREBASE_CONFIG;
-  if (!firebase.apps.length) {
-    firebase.initializeApp(config);
-  }
+  try {
+    if (!firebase.apps.length) {
+      firebase.initializeApp(window.POMODORO_FIREBASE_CONFIG);
+    }
 
-  state.firebaseAuth = firebase.auth();
-  state.firebaseDb = firebase.firestore();
-  state.firebaseReady = true;
-  updateAuthUI();
+    state.firebaseAuth = firebase.auth();
+    state.firebaseDb = firebase.firestore();
+    state.firebaseReady = true;
+    state.authReady = true;
 
-  state.firebaseAuth.onAuthStateChanged(async (user) => {
-    state.authUser = user;
+    state.firebaseAuth.onAuthStateChanged(async (user) => {
+      state.currentUser = user;
+      updateAuthUI();
+      if (!user) {
+        setCloudSyncStatus("");
+        return;
+      }
+
+      setCloudSyncStatus("Signed in. Syncing stats...");
+      await pullStatsFromCloud();
+      scheduleCloudSync(true);
+      updateUI();
+    });
+  } catch (error) {
+    state.firebaseReady = false;
     updateAuthUI();
-
-    if (!user) {
-      return;
-    }
-
-    try {
-      await pullOrMergeCloudStats(user);
-    } catch (error) {
-      updateAuthUI("Signed in. Cloud sync currently unavailable.");
-    }
-  });
-}
-
-async function signInWithGoogle() {
-  if (!state.firebaseReady || !state.firebaseAuth) {
-    updateAuthUI("Google sign-in unavailable. Add firebase-config.js first.");
-    return;
+    setCloudSyncStatus("Firebase setup failed. Check config values.");
   }
-
-  try {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    await state.firebaseAuth.signInWithPopup(provider);
-  } catch (error) {
-    updateAuthUI("Sign-in cancelled or blocked by browser popup settings.");
-  }
-}
-
-async function signOutCloud() {
-  if (!state.firebaseReady || !state.firebaseAuth) {
-    return;
-  }
-
-  try {
-    await state.firebaseAuth.signOut();
-    updateAuthUI("Signed out. Local stats continue.");
-  } catch (error) {
-    updateAuthUI("Unable to sign out right now.");
-  }
-}
-
-function resetLifetimeStats() {
-  const shouldReset = window.confirm("Reset all saved stats (lifetime, daily, weekly) on this device and cloud?");
-  if (!shouldReset) {
-    return;
-  }
-
-  state.lifetimeFocusSessions = 0;
-  state.lifetimePomodoroMs = 0;
-  state.dailyStats = {};
-  state.unsavedUsageMs = 0;
-  markStatsUpdated();
-  saveUsageStats();
-  updateUI();
-  syncStatsToCloud(true);
 }
 
 function formatTime(value) {
@@ -881,13 +888,16 @@ function updateUI() {
   muteBtn.setAttribute("aria-label", state.muted ? "Unmute alarm" : "Mute alarm");
   muteBtn.setAttribute("title", state.muted ? "Unmute alarm" : "Mute alarm");
   muteBtn.setAttribute("aria-pressed", state.muted ? "true" : "false");
-  focusSessionsCount.textContent = state.lifetimeFocusSessions.toString();
-  totalPomodoroTime.textContent = formatTrackedDuration(state.lifetimePomodoroMs);
-  const today = getTodayStats();
-  const weekly = getWeeklyStats();
-  todayStats.textContent = `${today.sessions} sessions - ${formatTrackedDuration(today.pomodoroMs)}`;
-  weeklyStats.textContent = `${weekly.sessions} sessions - ${formatTrackedDuration(weekly.pomodoroMs)}`;
-  renderWeeklyBreakdown();
+
+  const stats = aggregateStats(state.statsRange);
+  sessionsStatLabel.textContent = stats.sessionsLabel;
+  timeStatLabel.textContent = stats.timeLabel;
+  focusSessionsCount.textContent = stats.sessions.toString();
+  totalPomodoroTime.textContent = formatTrackedDuration(stats.pomodoroMs);
+
+  todayStatsBtn.classList.toggle("is-active", state.statsRange === "today");
+  weeklyStatsBtn.classList.toggle("is-active", state.statsRange === "weekly");
+  lifetimeStatsBtn.classList.toggle("is-active", state.statsRange === "lifetime");
 
   document.body.dataset.session = state.mode;
 
@@ -953,9 +963,8 @@ function switchMode(recordHistory = true) {
   if (state.mode === "focus") {
     state.completedFocusSessions += 1;
     state.lifetimeFocusSessions += 1;
-    const today = ensureDayStats(todayKey());
-    today.sessions += 1;
-    markStatsUpdated();
+    ensureTodayStatsBucket();
+    state.statsByDay[todayKey()].focusSessions += 1;
     saveUsageStats();
     state.mode = state.completedFocusSessions % 4 === 0 ? "longBreak" : "shortBreak";
   } else {
@@ -1084,6 +1093,22 @@ function resetTimer() {
   updateUI();
 }
 
+function resetLifetimeStats() {
+  const ok = window.confirm("Reset all lifetime, weekly, and daily pomodoro stats?");
+  if (!ok) {
+    return;
+  }
+
+  state.lifetimeFocusSessions = 0;
+  state.lifetimePomodoroMs = 0;
+  state.statsByDay = {};
+  ensureTodayStatsBucket();
+  state.unsavedUsageMs = 0;
+  saveUsageStats();
+  scheduleCloudSync(true);
+  updateUI();
+}
+
 function seekBy(seconds) {
   state.remainingSeconds = Math.max(0, Math.min(state.totalSeconds, state.remainingSeconds + seconds));
   if (state.running) {
@@ -1170,6 +1195,9 @@ async function togglePiP() {
         await pipVideo.play().catch(() => {});
         setPiPButtonState(true);
         setPiPStickyPreference(true);
+        if (isFirefoxBrowser()) {
+          supportHint.textContent = "Firefox note: right-click PiP once and enable \"Always on top\".";
+        }
       } else {
         pipVideo.hidden = true;
         pipVideo.pause();
@@ -1216,6 +1244,20 @@ settingsBtn.addEventListener("click", () => setSettingsPanelState(settingsPanel.
 
 resetBtn.addEventListener("click", () => resetTimer());
 pipBtn.addEventListener("click", () => togglePiP());
+todayStatsBtn.addEventListener("click", () => setStatsRange("today"));
+weeklyStatsBtn.addEventListener("click", () => setStatsRange("weekly"));
+lifetimeStatsBtn.addEventListener("click", () => setStatsRange("lifetime"));
+resetLifetimeBtn.addEventListener("click", () => resetLifetimeStats());
+googleSignInBtn.addEventListener("click", () => {
+  signInWithGoogle().catch(() => {
+    setCloudSyncStatus("Google sign-in failed. Allow popups and try again.");
+  });
+});
+signOutBtn.addEventListener("click", () => {
+  signOutGoogle().catch(() => {
+    setCloudSyncStatus("Sign-out failed. Please retry.");
+  });
+});
 
 muteBtn.addEventListener("click", () => {
   state.muted = !state.muted;
@@ -1229,9 +1271,6 @@ longBreakMinutesInput.addEventListener("change", () => applySettings(!state.runn
 themeSolidBtn.addEventListener("click", () => setBackgroundTheme("solid"));
 themePlanetsBtn.addEventListener("click", () => setBackgroundTheme("planets"));
 themeMarbleBtn.addEventListener("click", () => setBackgroundTheme("marble"));
-googleSignInBtn.addEventListener("click", () => signInWithGoogle());
-signOutBtn.addEventListener("click", () => signOutCloud());
-resetLifetimeBtn.addEventListener("click", () => resetLifetimeStats());
 
 pipVideo.addEventListener("play", () => {
   if (!state.suppressVideoEvents) {
@@ -1272,7 +1311,7 @@ pipVideo.addEventListener("enterpictureinpicture", () => {
   state.pipReenterAttempts = 0;
   setPiPButtonState(true);
   supportHint.textContent = isFirefoxBrowser()
-    ? "Firefox tip: right-click PiP window and enable 'Always on top'."
+    ? "Firefox note: right-click PiP and enable \"Always on top\" for top-most behavior."
     : "PiP active and pinned on top while timer runs (best in Chrome/Edge).";
 });
 
@@ -1281,9 +1320,7 @@ pipVideo.addEventListener("leavepictureinpicture", () => {
   if (state.preferPiPOnTop && state.running) {
     keepPiPOnTop();
   } else {
-    supportHint.textContent = isFirefoxBrowser()
-      ? "Firefox requires enabling Always on top from the PiP window menu."
-      : "";
+    supportHint.textContent = "";
   }
 });
 
@@ -1309,6 +1346,7 @@ window.addEventListener("focus", () => {
 window.addEventListener("beforeunload", () => {
   addUsageElapsed(Date.now());
   saveUsageStats();
+  scheduleCloudSync(true);
 
   if (state.timerTimer) {
     clearInterval(state.timerTimer);
@@ -1328,8 +1366,9 @@ applySettings(true);
 setSettingsPanelState(false);
 setBackgroundTheme(localStorage.getItem("pomodoroBackgroundTheme") || "solid");
 loadUsageStats();
+loadStatsRangePreference();
 loadPiPStickyPreference();
-setupMediaSessionHandlers();
 setupFirebaseAuth();
+setupMediaSessionHandlers();
 updateAuthUI();
 updateUI();

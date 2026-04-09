@@ -115,6 +115,31 @@ body::before {
   font-size: 0.78rem;
 }
 
+.auth-panel {
+  margin-top: 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel) 65%, transparent);
+  padding: 0.7rem 0.8rem;
+}
+
+.auth-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.auth-btn {
+  border-radius: 999px;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.86rem;
+}
+
+.auth-hint {
+  margin-top: 0.45rem;
+  margin-bottom: 0;
+}
+
 .timer-card {
   margin-top: 1.4rem;
   padding: 1.3rem;
@@ -284,8 +309,29 @@ input[type="number"]::-webkit-inner-spin-button {
   gap: 0.55rem;
 }
 
-.auth-card {
+.stats-toolbar {
   grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.stats-toggle,
+.stats-reset {
+  min-height: 36px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  padding: 0.45rem 0.5rem;
+}
+
+.stats-toggle.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.stats-reset {
+  background: color-mix(in srgb, var(--btn-bg) 60%, #451f25 40%);
 }
 
 .stat-card {
@@ -293,10 +339,6 @@ input[type="number"]::-webkit-inner-spin-button {
   border-radius: 12px;
   background: color-mix(in srgb, var(--panel) 75%, transparent);
   padding: 0.7rem 0.8rem;
-}
-
-.stat-card-wide {
-  grid-column: 1 / -1;
 }
 
 .stat-label {
@@ -312,50 +354,6 @@ input[type="number"]::-webkit-inner-spin-button {
   font-size: 1.05rem;
   font-weight: 700;
   color: var(--ink);
-}
-
-.stat-value-small {
-  font-size: 0.94rem;
-  font-weight: 600;
-}
-
-.auth-actions {
-  margin-top: 0.55rem;
-  display: flex;
-  gap: 0.45rem;
-  flex-wrap: wrap;
-}
-
-.auth-btn {
-  padding: 0.45rem 0.7rem;
-  border-radius: 999px;
-  font-size: 0.82rem;
-}
-
-.weekly-breakdown {
-  margin-top: 0.45rem;
-  display: grid;
-  gap: 0.35rem;
-}
-
-.weekly-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.45rem;
-  font-size: 0.83rem;
-  color: var(--ink-soft);
-}
-
-.danger-btn {
-  margin-top: 0.7rem;
-  border-color: rgba(255, 166, 166, 0.44);
-  color: #ffe9e9;
-  background: rgba(155, 39, 52, 0.5);
-}
-
-.danger-btn:hover {
-  border-color: rgba(255, 206, 206, 0.8);
 }
 
 .transport {
@@ -559,6 +557,10 @@ body[data-bgset="marble"][data-session="longBreak"] {
 
   .stats {
     grid-template-columns: 1fr;
+  }
+
+  .stats-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .pip-video-helper {

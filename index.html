@@ -23,6 +23,15 @@
         <h1>Pomodoro</h1>
       </header>
 
+      <section class="auth-panel" aria-label="Account and sync">
+        <div class="auth-actions">
+          <button id="googleSignInBtn" class="btn auth-btn" type="button">Sign in with Google</button>
+          <button id="signOutBtn" class="btn auth-btn" type="button" hidden>Sign out</button>
+        </div>
+        <p id="authStatus" class="hint auth-hint">Local mode (not signed in)</p>
+        <p id="cloudSyncStatus" class="hint auth-hint"></p>
+      </section>
+
       <section class="timer-card" aria-live="polite">
         <div class="timer-head">
           <p id="modeLabel" class="mode">Focus Session</p>
@@ -70,34 +79,19 @@
       </section>
 
       <section class="stats" aria-label="Pomodoro usage stats">
-        <article class="stat-card auth-card">
-          <p class="stat-label">Cloud Sync</p>
-          <p id="authStatus" class="stat-value stat-value-small">Not signed in</p>
-          <div class="auth-actions">
-            <button id="googleSignInBtn" class="btn auth-btn" type="button">Sign in with Google</button>
-            <button id="signOutBtn" class="btn auth-btn" type="button" hidden>Sign out</button>
-          </div>
-        </article>
+        <div class="stats-toolbar" role="group" aria-label="Stats range">
+          <button id="todayStatsBtn" class="btn stats-toggle is-active" type="button" data-range="today">Today</button>
+          <button id="weeklyStatsBtn" class="btn stats-toggle" type="button" data-range="weekly">Weekly</button>
+          <button id="lifetimeStatsBtn" class="btn stats-toggle" type="button" data-range="lifetime">Lifetime</button>
+          <button id="resetLifetimeBtn" class="btn stats-reset" type="button">Reset Lifetime</button>
+        </div>
         <article class="stat-card">
-          <p class="stat-label">Focus Sessions</p>
+          <p id="sessionsStatLabel" class="stat-label">Today Focus Sessions</p>
           <p id="focusSessionsCount" class="stat-value">0</p>
         </article>
         <article class="stat-card">
-          <p class="stat-label">Total Pomodoro Time</p>
+          <p id="timeStatLabel" class="stat-label">Today Pomodoro Time</p>
           <p id="totalPomodoroTime" class="stat-value">00:00:00</p>
-        </article>
-        <article class="stat-card">
-          <p class="stat-label">Today</p>
-          <p id="todayStats" class="stat-value">0 sessions - 00:00:00</p>
-        </article>
-        <article class="stat-card">
-          <p class="stat-label">Last 7 Days</p>
-          <p id="weeklyStats" class="stat-value">0 sessions - 00:00:00</p>
-        </article>
-        <article class="stat-card stat-card-wide">
-          <p class="stat-label">Weekly Breakdown</p>
-          <div id="weeklyBreakdown" class="weekly-breakdown"></div>
-          <button id="resetLifetimeBtn" class="btn danger-btn" type="button">Reset Lifetime Stats</button>
         </article>
       </section>
 
@@ -132,9 +126,9 @@
     <video id="pipVideo" playsinline controls hidden></video>
     <canvas id="pipCanvas" width="640" height="360" hidden></canvas>
 
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
     <script src="app.js"></script>
   </body>
