@@ -47,20 +47,59 @@ If they are missing, the app falls back to canvas rendering.
 
 ## Deploy Online With Vercel
 
-This repo is configured for Vercel static hosting + optional serverless API routes.
+This repo is now configured in the simplest stable way for:
 
-1. Push this repo to GitHub.
-2. Open Vercel and click `Add New...` -> `Project`.
-3. Import your repository.
-4. Keep defaults (Framework Preset: `Other`).
-5. Click `Deploy`.
+- Static frontend from project root
+- Serverless functions from `api/`
+- SPA-safe fallback (non-file routes go to `index.html`)
 
-After deploy you will get a public URL like `https://your-project.vercel.app`.
+### One-time setup
 
-CLI option:
+1. Push this repository to GitHub.
+2. Sign in to Vercel with GitHub.
+3. In Vercel, click Add New -> Project.
+4. Import this repository.
+5. Keep Framework Preset as Other.
+6. Keep Root Directory as .
+7. Build Command: leave empty.
+8. Output Directory: leave empty.
+9. Install Command: npm install (default is fine).
+10. Click Deploy.
+
+After deploy, you will get a URL like:
+
+- https://your-project-name.vercel.app
+
+### Every update after that
+
+1. Commit and push changes to your GitHub branch.
+2. Vercel auto-builds and deploys.
+3. Open the latest deployment from Vercel Dashboard -> your project.
+
+### Verify deployment
+
+1. Open the root URL and make sure the timer UI loads.
+2. Open `/api/health` and confirm JSON response:
+
+```json
+{"ok":true,"service":"pomodoro-me"}
+```
+
+### If deployment fails
+
+Check these first:
+
+1. Node version is 20.x in `package.json` engines.
+2. `vercel.json` is valid JSON (no trailing commas).
+3. `api/health.js` exists and exports a handler.
+4. No blocked large files were pushed accidentally.
+5. In Vercel Project Settings -> General, Root Directory is `.`.
+
+### Optional: deploy using Vercel CLI
 
 ```bash
 npm i -g vercel
+vercel login
 vercel
 vercel --prod
 ```
