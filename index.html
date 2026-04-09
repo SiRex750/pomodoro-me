@@ -70,6 +70,14 @@
       </section>
 
       <section class="stats" aria-label="Pomodoro usage stats">
+        <article class="stat-card auth-card">
+          <p class="stat-label">Cloud Sync</p>
+          <p id="authStatus" class="stat-value stat-value-small">Not signed in</p>
+          <div class="auth-actions">
+            <button id="googleSignInBtn" class="btn auth-btn" type="button">Sign in with Google</button>
+            <button id="signOutBtn" class="btn auth-btn" type="button" hidden>Sign out</button>
+          </div>
+        </article>
         <article class="stat-card">
           <p class="stat-label">Focus Sessions</p>
           <p id="focusSessionsCount" class="stat-value">0</p>
@@ -77,6 +85,19 @@
         <article class="stat-card">
           <p class="stat-label">Total Pomodoro Time</p>
           <p id="totalPomodoroTime" class="stat-value">00:00:00</p>
+        </article>
+        <article class="stat-card">
+          <p class="stat-label">Today</p>
+          <p id="todayStats" class="stat-value">0 sessions - 00:00:00</p>
+        </article>
+        <article class="stat-card">
+          <p class="stat-label">Last 7 Days</p>
+          <p id="weeklyStats" class="stat-value">0 sessions - 00:00:00</p>
+        </article>
+        <article class="stat-card stat-card-wide">
+          <p class="stat-label">Weekly Breakdown</p>
+          <div id="weeklyBreakdown" class="weekly-breakdown"></div>
+          <button id="resetLifetimeBtn" class="btn danger-btn" type="button">Reset Lifetime Stats</button>
         </article>
       </section>
 
@@ -111,6 +132,10 @@
     <video id="pipVideo" playsinline controls hidden></video>
     <canvas id="pipCanvas" width="640" height="360" hidden></canvas>
 
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="firebase-config.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

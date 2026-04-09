@@ -9,6 +9,8 @@ A minimalist Pomodoro timer with Picture-in-Picture support, theme backgrounds, 
 - Theme support: Solid, Planets, Marble
 - Local assets support (works without internet for backgrounds)
 - Optional serverless API route support on Vercel
+- Google sign-in with cloud stats sync
+- Daily, weekly, and lifetime stats
 
 ## Project Structure
 
@@ -44,6 +46,36 @@ For smoother PiP, place these files in `assets/`:
 - `assets/long-break.mp4`
 
 If they are missing, the app falls back to canvas rendering.
+
+## PiP Behavior Notes
+
+- Chrome/Edge/Safari: app can programmatically re-open PiP while running.
+- Firefox: browser controls the PiP window "Always on top" setting.
+- In Firefox, right-click the PiP window and enable `Always on top`.
+
+## Google Sign-In + Cloud Stats Setup
+
+To enable Google sign-in and sync stats across devices:
+
+1. Create a Firebase project.
+2. In Firebase Console -> Build -> Authentication -> Sign-in method, enable `Google`.
+3. In Firebase Console -> Build -> Firestore Database, create a database in production or test mode.
+4. In Firebase Console -> Project settings -> General -> Your apps, add a Web app and copy config values.
+5. Open `firebase-config.js` and fill:
+
+```js
+window.POMODORO_FIREBASE_CONFIG = {
+	apiKey: "YOUR_API_KEY",
+	authDomain: "YOUR_PROJECT.firebaseapp.com",
+	projectId: "YOUR_PROJECT_ID",
+	appId: "YOUR_APP_ID",
+};
+```
+
+6. In Firebase Authentication -> Settings -> Authorized domains, add your Vercel domain (for example `your-project.vercel.app`) and any custom domain.
+7. Deploy again.
+
+If `firebase-config.js` is left empty, app still works with local-only stats.
 
 ## Deploy Online With Vercel
 
