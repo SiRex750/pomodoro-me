@@ -20,6 +20,8 @@ const themeSolidBtn = document.getElementById("themeSolidBtn");
 const themePlanetsBtn = document.getElementById("themePlanetsBtn");
 const themeMarbleBtn = document.getElementById("themeMarbleBtn");
 const supportHint = document.getElementById("supportHint");
+const focusSessionsCount = document.getElementById("focusSessionsCount");
+const totalPomodoroTime = document.getElementById("totalPomodoroTime");
 
 const pipVideo = document.getElementById("pipVideo");
 const pipCanvas = document.getElementById("pipCanvas");
@@ -47,6 +49,9 @@ const THEME_IMAGE_SETS = {
   planets: PLANET_IMAGES,
   marble: MARBLE_IMAGES,
 };
+
+const USAGE_STATS_KEY = "pomodoroUsageStatsV1";
+const PIP_STICKY_KEY = "pomodoroPiPStickyV1";
 
 const loadedImages = {};
 for (const [themeName, imageMap] of Object.entries(THEME_IMAGE_SETS)) {
@@ -82,7 +87,117 @@ const state = {
   backgroundTheme: "solid",
   checkedVideoSources: {},
   suppressVideoEvents: false,
+  preferPiPOnTop: false,
+  pipReenterAttempts: 0,
+  lastTrackedAtMs: null,
+  lifetimeFocusSessions: 0,
+  lifetimePomodoroMs: 0,
+  unsavedUsageMs: 0,
 };
+
+function formatTrackedDuration(totalMs) {
+  const totalSeconds = Math.floor(Math.max(0, totalMs) / 1000);
+  const hours = Math.floor(totalSeconds / 3600)
+    .toString()
+    .padStart(2, "0");
+  const mins = Math.floor((totalSeconds % 3600) / 60)
+    .toString()
+    .padStart(2, "0");
+  const secs = Math.floor(totalSeconds % 60)
+    .toString()
+    .padStart(2, "0");
+  return `${hours}:${mins}:${secs}`;
+}
+
+function loadUsageStats() {
+  try {
+    const raw = localStorage.getItem(USAGE_STATS_KEY);
+    if (!raw) {
+      return;
+    }
+
+    const parsed = JSON.parse(raw);
+    state.lifetimeFocusSessions = Number.isFinite(parsed.lifetimeFocusSessions)
+      ? Math.max(0, Math.floor(parsed.lifetimeFocusSessions))
+      : 0;
+    state.lifetimePomodoroMs = Number.isFinite(parsed.lifetimePomodoroMs)
+      ? Math.max(0, Math.floor(parsed.lifetimePomodoroMs))
+      : 0;
+  } catch (error) {
+    state.lifetimeFocusSessions = 0;
+    state.lifetimePomodoroMs = 0;
+  }
+}
+
+function saveUsageStats() {
+  localStorage.setItem(
+    USAGE_STATS_KEY,
+    JSON.stringify({
+      lifetimeFocusSessions: state.lifetimeFocusSessions,
+      lifetimePomodoroMs: Math.floor(state.lifetimePomodoroMs),
+    })
+  );
+  state.unsavedUsageMs = 0;
+}
+
+function loadPiPStickyPreference() {
+  state.preferPiPOnTop = localStorage.getItem(PIP_STICKY_KEY) === "1";
+}
+
+function setPiPStickyPreference(value) {
+  state.preferPiPOnTop = value;
+  localStorage.setItem(PIP_STICKY_KEY, value ? "1" : "0");
+}
+
+function addUsageElapsed(nowMs = Date.now()) {
+  if (!state.running || !state.lastTrackedAtMs) {
+    return;
+  }
+
+  const delta = Math.max(0, nowMs - state.lastTrackedAtMs);
+  state.lastTrackedAtMs = nowMs;
+  state.lifetimePomodoroMs += delta;
+  state.unsavedUsageMs += delta;
+
+  if (state.unsavedUsageMs >= 5000) {
+    saveUsageStats();
+  }
+}
+
+async function keepPiPOnTop() {
+  if (!state.preferPiPOnTop || !state.running) {
+    return;
+  }
+
+  if (typeof pipVideo.requestPictureInPicture !== "function") {
+    return;
+  }
+
+  if (document.pictureInPictureElement) {
+    return;
+  }
+
+  const attemptDelay = 220 + state.pipReenterAttempts * 240;
+  state.pipReenterAttempts += 1;
+
+  if (state.pipReenterAttempts > 3) {
+    supportHint.textContent = "PiP closed. Browser requires another click to re-open it.";
+    return;
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, attemptDelay));
+
+  try {
+    await pipVideo.play().catch(() => {});
+    await pipVideo.requestPictureInPicture();
+  } catch (error) {
+    if (state.pipReenterAttempts >= 3) {
+      supportHint.textContent = "PiP closed. Click PiP again to keep it on top.";
+    } else {
+      keepPiPOnTop();
+    }
+  }
+}
 
 function formatTime(value) {
   const mins = Math.floor(value / 60)
@@ -454,6 +569,8 @@ function updateUI() {
   muteBtn.setAttribute("aria-label", state.muted ? "Unmute alarm" : "Mute alarm");
   muteBtn.setAttribute("title", state.muted ? "Unmute alarm" : "Mute alarm");
   muteBtn.setAttribute("aria-pressed", state.muted ? "true" : "false");
+  focusSessionsCount.textContent = state.lifetimeFocusSessions.toString();
+  totalPomodoroTime.textContent = formatTrackedDuration(state.lifetimePomodoroMs);
 
   document.body.dataset.session = state.mode;
 
@@ -518,6 +635,8 @@ function switchMode(recordHistory = true) {
 
   if (state.mode === "focus") {
     state.completedFocusSessions += 1;
+    state.lifetimeFocusSessions += 1;
+    saveUsageStats();
     state.mode = state.completedFocusSessions % 4 === 0 ? "longBreak" : "shortBreak";
   } else {
     state.mode = "focus";
@@ -581,6 +700,8 @@ function tick() {
     return;
   }
 
+  addUsageElapsed(Date.now());
+
   if (state.endAtMs) {
     state.remainingSeconds = Math.max(0, (state.endAtMs - Date.now()) / 1000);
   }
@@ -599,6 +720,7 @@ function startTimer() {
   }
 
   state.running = true;
+  state.lastTrackedAtMs = Date.now();
   state.endAtMs = Date.now() + state.remainingSeconds * 1000;
 
   if (!state.timerTimer) {
@@ -618,14 +740,20 @@ function pauseTimer() {
     state.remainingSeconds = Math.max(0, (state.endAtMs - Date.now()) / 1000);
   }
 
+  addUsageElapsed(Date.now());
+
   state.running = false;
+  state.lastTrackedAtMs = null;
   state.endAtMs = null;
+  saveUsageStats();
   syncVideoPlayback(false);
   updateUI();
 }
 
 function resetTimer() {
+  addUsageElapsed(Date.now());
   state.running = false;
+  state.lastTrackedAtMs = null;
   state.mode = "focus";
   state.completedFocusSessions = 0;
   state.history = [];
@@ -703,6 +831,7 @@ async function togglePiP() {
     } 
 
     if (document.pictureInPictureElement) {
+      setPiPStickyPreference(false);
       await document.exitPictureInPicture();
       return;
     }
@@ -712,6 +841,7 @@ async function togglePiP() {
       pipVideo.hidden = true; // Chrome allows PiP even if video is hidden usually, but we keep it hidden to not ruin UI
       await pipVideo.play().catch(() => {});
       await pipVideo.requestPictureInPicture();
+      setPiPStickyPreference(true);
     } else {
       // Fallback for Firefox which may not support requestPictureInPicture from a button
       if (pipVideo.hidden) {
@@ -719,10 +849,12 @@ async function togglePiP() {
         pipVideo.classList.add("pip-video-helper");
         await pipVideo.play().catch(() => {});
         setPiPButtonState(true);
+        setPiPStickyPreference(true);
       } else {
         pipVideo.hidden = true;
         pipVideo.pause();
         setPiPButtonState(false);
+        setPiPStickyPreference(false);
       }
     }
   } catch (error) {
@@ -814,13 +946,18 @@ pipVideo.addEventListener("loadedmetadata", () => {
 });
 
 pipVideo.addEventListener("enterpictureinpicture", () => {
+  state.pipReenterAttempts = 0;
   setPiPButtonState(true);
-  supportHint.textContent = "PiP active. Use play/pause and +/-10s controls (best in Chrome/Edge).";
+  supportHint.textContent = "PiP active and pinned on top while timer runs (best in Chrome/Edge).";
 });
 
 pipVideo.addEventListener("leavepictureinpicture", () => {
   setPiPButtonState(false);
-  supportHint.textContent = "";
+  if (state.preferPiPOnTop && state.running) {
+    keepPiPOnTop();
+  } else {
+    supportHint.textContent = "";
+  }
 });
 
 document.addEventListener("visibilitychange", () => {
@@ -843,6 +980,9 @@ window.addEventListener("focus", () => {
 });
 
 window.addEventListener("beforeunload", () => {
+  addUsageElapsed(Date.now());
+  saveUsageStats();
+
   if (state.timerTimer) {
     clearInterval(state.timerTimer);
   }
@@ -860,4 +1000,7 @@ if (!("pictureInPictureEnabled" in document) || !document.pictureInPictureEnable
 applySettings(true);
 setSettingsPanelState(false);
 setBackgroundTheme(localStorage.getItem("pomodoroBackgroundTheme") || "solid");
+loadUsageStats();
+loadPiPStickyPreference();
 setupMediaSessionHandlers();
+updateUI();

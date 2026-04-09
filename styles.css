@@ -277,6 +277,35 @@ input[type="number"]::-webkit-inner-spin-button {
   gap: 0.6rem;
 }
 
+.stats {
+  margin-top: 0.85rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.stat-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel) 75%, transparent);
+  padding: 0.7rem 0.8rem;
+}
+
+.stat-label {
+  margin: 0;
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.stat-value {
+  margin: 0.32rem 0 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
 .transport {
   display: flex;
   justify-content: center;
@@ -473,6 +502,10 @@ body[data-bgset="marble"][data-session="longBreak"] {
   }
 
   .settings {
+    grid-template-columns: 1fr;
+  }
+
+  .stats {
     grid-template-columns: 1fr;
   }
 
