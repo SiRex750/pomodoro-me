@@ -24,6 +24,13 @@ const focusSessionsCount = document.getElementById("focusSessionsCount");
 const totalPomodoroTime = document.getElementById("totalPomodoroTime");
 const sessionsStatLabel = document.getElementById("sessionsStatLabel");
 const timeStatLabel = document.getElementById("timeStatLabel");
+const activityToggleBtn = document.getElementById("activityToggleBtn");
+const activityToggleIcon = document.getElementById("activityToggleIcon");
+const activityPanel = document.getElementById("activityPanel");
+const activityHeatmapGrid = document.getElementById("activityHeatmapGrid");
+const activityHeatmapMeta = document.getElementById("activityHeatmapMeta");
+const activityTimeGraph = document.getElementById("activityTimeGraph");
+const activitySessionsGraph = document.getElementById("activitySessionsGraph");
 const todayStatsBtn = document.getElementById("todayStatsBtn");
 const weeklyStatsBtn = document.getElementById("weeklyStatsBtn");
 const lifetimeStatsBtn = document.getElementById("lifetimeStatsBtn");
@@ -70,6 +77,7 @@ const THEME_IMAGE_SETS = {
 const USAGE_STATS_KEY = "pomodoroUsageStatsV1";
 const PIP_STICKY_KEY = "pomodoroPiPStickyV1";
 const STATS_RANGE_KEY = "pomodoroStatsRangeV1";
+const ACTIVITY_PANEL_OPEN_KEY = "pomodoroActivityPanelOpenV1";
 const STATS_DOC_VERSION = 1;
 const CLOUD_SYNC_DEBOUNCE_MS = 1200;
 
@@ -126,6 +134,7 @@ const state = {
   lastCloudSyncAt: 0,
   authMenuOpen: false,
   authSyncing: false,
+  activityPanelOpen: true,
 };
 
 function setAuthMenuState(open) {
@@ -267,6 +276,18 @@ function setPiPStickyPreference(value) {
   localStorage.setItem(PIP_STICKY_KEY, value ? "1" : "0");
 }
 
+function loadActivityPanelPreference() {
+  state.activityPanelOpen = localStorage.getItem(ACTIVITY_PANEL_OPEN_KEY) !== "0";
+}
+
+function setActivityPanelState(open) {
+  state.activityPanelOpen = open;
+  localStorage.setItem(ACTIVITY_PANEL_OPEN_KEY, open ? "1" : "0");
+  activityPanel.hidden = !open;
+  activityToggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
+  activityToggleIcon.className = open ? "ri-arrow-up-s-line" : "ri-arrow-down-s-line";
+}
+
 function setStatsRange(range) {
   if (!["today", "weekly", "lifetime"].includes(range)) {
     return;
@@ -316,6 +337,96 @@ function aggregateStats(range) {
     sessionsLabel: "Today Focus Sessions",
     timeLabel: "Today Pomodoro Time",
   };
+}
+
+function dailyStatsForKey(key) {
+  const bucket = state.statsByDay[key];
+  if (!bucket) {
+    return { focusSessions: 0, pomodoroMs: 0 };
+  }
+
+  return {
+    focusSessions: Math.max(0, Math.floor(bucket.focusSessions || 0)),
+    pomodoroMs: Math.max(0, Math.floor(bucket.pomodoroMs || 0)),
+  };
+}
+
+function getDayKeyOffset(daysAgo) {
+  const base = new Date();
+  base.setHours(0, 0, 0, 0);
+  base.setDate(base.getDate() - daysAgo);
+  const year = base.getFullYear();
+  const month = String(base.getMonth() + 1).padStart(2, "0");
+  const day = String(base.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getActivitySeries(days) {
+  const series = [];
+  for (let i = days - 1; i >= 0; i -= 1) {
+    const key = getDayKeyOffset(i);
+    series.push({ key, ...dailyStatsForKey(key) });
+  }
+  return series;
+}
+
+function heatmapLevel(value, maxValue) {
+  if (value <= 0 || maxValue <= 0) {
+    return 0;
+  }
+
+  const ratio = value / maxValue;
+  if (ratio <= 0.25) {
+    return 1;
+  }
+  if (ratio <= 0.5) {
+    return 2;
+  }
+  if (ratio <= 0.75) {
+    return 3;
+  }
+  return 4;
+}
+
+function renderActivityBars(container, series, metric, isTimeGraph = false) {
+  container.innerHTML = "";
+  const max = Math.max(1, ...series.map((entry) => entry[metric]));
+
+  for (const entry of series) {
+    const value = entry[metric];
+    const heightPercent = Math.max(6, Math.round((value / max) * 100));
+    const bar = document.createElement("div");
+    bar.className = `activity-bar${isTimeGraph ? " activity-bar-time" : ""}`;
+    bar.style.height = `${heightPercent}%`;
+
+    const labelValue = isTimeGraph
+      ? `${Math.round(entry.pomodoroMs / 60000)} min`
+      : `${entry.focusSessions} sessions`;
+    bar.title = `${entry.key}: ${labelValue}`;
+    container.appendChild(bar);
+  }
+}
+
+function renderActivityDashboard() {
+  const heatmapSeries = getActivitySeries(84);
+  const graphSeries = getActivitySeries(14);
+  const maxSessions = Math.max(1, ...heatmapSeries.map((entry) => entry.focusSessions));
+
+  activityHeatmapGrid.innerHTML = "";
+  for (const entry of heatmapSeries) {
+    const cell = document.createElement("div");
+    const level = heatmapLevel(entry.focusSessions, maxSessions);
+    cell.className = `activity-cell level-${level}`;
+    cell.title = `${entry.key}: ${entry.focusSessions} sessions, ${Math.round(entry.pomodoroMs / 60000)} min`;
+    activityHeatmapGrid.appendChild(cell);
+  }
+
+  const totalSessions = heatmapSeries.reduce((sum, entry) => sum + entry.focusSessions, 0);
+  const totalMs = heatmapSeries.reduce((sum, entry) => sum + entry.pomodoroMs, 0);
+  activityHeatmapMeta.textContent = `Last 84 days: ${totalSessions} focus sessions, ${formatTrackedDuration(totalMs)} total focus time`;
+
+  renderActivityBars(activityTimeGraph, graphSeries, "pomodoroMs", true);
+  renderActivityBars(activitySessionsGraph, graphSeries, "focusSessions", false);
 }
 
 function addUsageElapsed(nowMs = Date.now()) {
@@ -989,6 +1100,7 @@ function updateUI() {
 
   document.body.dataset.session = state.mode;
 
+  renderActivityDashboard();
   syncVideoPositionFromTimer();
   updateMediaSession();
   renderPiPFrame();
@@ -1336,6 +1448,7 @@ todayStatsBtn.addEventListener("click", () => setStatsRange("today"));
 weeklyStatsBtn.addEventListener("click", () => setStatsRange("weekly"));
 lifetimeStatsBtn.addEventListener("click", () => setStatsRange("lifetime"));
 resetLifetimeBtn.addEventListener("click", () => resetLifetimeStats());
+activityToggleBtn.addEventListener("click", () => setActivityPanelState(!state.activityPanelOpen));
 googleSignInBtn.addEventListener("click", (event) => {
   event.stopPropagation();
 
@@ -1484,7 +1597,9 @@ setBackgroundTheme(localStorage.getItem("pomodoroBackgroundTheme") || "solid");
 loadUsageStats();
 loadStatsRangePreference();
 loadPiPStickyPreference();
+loadActivityPanelPreference();
 setupFirebaseAuth();
 setupMediaSessionHandlers();
+setActivityPanelState(state.activityPanelOpen);
 updateAuthUI();
 updateUI();
