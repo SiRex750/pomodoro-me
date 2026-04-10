@@ -90,8 +90,10 @@ body::before {
   top: 1rem;
   right: 1rem;
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  align-items: flex-start;
+  justify-content: flex-end;
+  flex-direction: column;
+  gap: 0.45rem;
   z-index: 20;
 }
 
@@ -104,10 +106,45 @@ body::before {
   padding: 0;
   border-color: color-mix(in srgb, var(--line) 72%, #fff 28%);
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
 }
 
 .auth-icon-btn i {
   font-size: 1.2rem;
+}
+
+.auth-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.auth-menu {
+  min-width: 220px;
+  padding: 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel) 84%, transparent);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22);
+}
+
+.auth-menu-name {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.auth-menu-email {
+  margin: 0.2rem 0 0.6rem;
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  word-break: break-word;
+}
+
+.auth-menu-signout {
+  width: 100%;
+  border-radius: 10px;
+  min-height: 36px;
 }
 
 .app::before {
@@ -583,12 +620,16 @@ body[data-bgset="marble"][data-session="longBreak"] {
   .auth-fab {
     top: 0.75rem;
     right: 0.75rem;
-    gap: 0.4rem;
+    gap: 0.35rem;
   }
 
   .auth-icon-btn {
     width: 42px;
     height: 42px;
+  }
+
+  .auth-menu {
+    min-width: 190px;
   }
 
   .pip-video-helper {

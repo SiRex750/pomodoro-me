@@ -19,11 +19,14 @@
   <body>
     <div class="auth-fab" aria-label="Account actions">
       <button id="googleSignInBtn" class="btn auth-icon-btn" type="button" aria-label="Sign in with Google" title="Sign in with Google">
-        <i class="ri-google-fill" aria-hidden="true"></i>
+        <i id="authProviderIcon" class="ri-google-fill" aria-hidden="true"></i>
+        <img id="authAvatar" class="auth-avatar" alt="Account profile" hidden />
       </button>
-      <button id="signOutBtn" class="btn auth-icon-btn" type="button" aria-label="Sign out" title="Sign out" hidden>
-        <i class="ri-logout-box-r-line" aria-hidden="true"></i>
-      </button>
+      <div id="authMenu" class="auth-menu" hidden>
+        <p id="authMenuName" class="auth-menu-name">Not signed in</p>
+        <p id="authMenuEmail" class="auth-menu-email"></p>
+        <button id="signOutBtn" class="btn auth-menu-signout" type="button">Sign out</button>
+      </div>
     </div>
 
     <main class="app">

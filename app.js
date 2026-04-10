@@ -29,6 +29,11 @@ const weeklyStatsBtn = document.getElementById("weeklyStatsBtn");
 const lifetimeStatsBtn = document.getElementById("lifetimeStatsBtn");
 const resetLifetimeBtn = document.getElementById("resetLifetimeBtn");
 const googleSignInBtn = document.getElementById("googleSignInBtn");
+const authProviderIcon = document.getElementById("authProviderIcon");
+const authAvatar = document.getElementById("authAvatar");
+const authMenu = document.getElementById("authMenu");
+const authMenuName = document.getElementById("authMenuName");
+const authMenuEmail = document.getElementById("authMenuEmail");
 const signOutBtn = document.getElementById("signOutBtn");
 const authStatus = document.getElementById("authStatus");
 const cloudSyncStatus = document.getElementById("cloudSyncStatus");
@@ -117,7 +122,14 @@ const state = {
   cloudSyncTimer: null,
   cloudSyncInFlight: false,
   lastCloudSyncAt: 0,
+  authMenuOpen: false,
 };
+
+function setAuthMenuState(open) {
+  state.authMenuOpen = open;
+  authMenu.hidden = !open;
+  googleSignInBtn.setAttribute("aria-expanded", open ? "true" : "false");
+}
 
 function todayKey() {
   const now = new Date();
@@ -365,9 +377,17 @@ function updateAuthUI() {
   if (!state.firebaseReady) {
     authStatus.textContent = "Local mode (Firebase not configured yet)";
     googleSignInBtn.disabled = true;
+    googleSignInBtn.hidden = false;
     googleSignInBtn.setAttribute("aria-label", "Google sign-in unavailable (Firebase not configured)");
     googleSignInBtn.setAttribute("title", "Google sign-in unavailable (Firebase not configured)");
+    authProviderIcon.hidden = false;
+    authProviderIcon.className = "ri-google-fill";
+    authAvatar.hidden = true;
+    authAvatar.removeAttribute("src");
+    authMenuName.textContent = "Not signed in";
+    authMenuEmail.textContent = "";
     signOutBtn.hidden = true;
+    setAuthMenuState(false);
     return;
   }
 
@@ -377,15 +397,40 @@ function updateAuthUI() {
     googleSignInBtn.hidden = false;
     googleSignInBtn.setAttribute("aria-label", "Sign in with Google");
     googleSignInBtn.setAttribute("title", "Sign in with Google");
+    authProviderIcon.hidden = false;
+    authProviderIcon.className = "ri-google-fill";
+    authAvatar.hidden = true;
+    authAvatar.removeAttribute("src");
+    authMenuName.textContent = "Not signed in";
+    authMenuEmail.textContent = "";
     signOutBtn.hidden = true;
+    setAuthMenuState(false);
     return;
   }
 
   authStatus.textContent = `Signed in as ${state.currentUser.displayName || state.currentUser.email || "Google user"}`;
-  googleSignInBtn.hidden = true;
+  googleSignInBtn.hidden = false;
+  googleSignInBtn.disabled = false;
+  googleSignInBtn.setAttribute("aria-label", "Open account menu");
+  googleSignInBtn.setAttribute("title", "Open account menu");
   signOutBtn.hidden = false;
   signOutBtn.setAttribute("aria-label", "Sign out");
   signOutBtn.setAttribute("title", "Sign out");
+
+  const profileUrl = state.currentUser.photoURL || "";
+  if (profileUrl) {
+    authAvatar.src = profileUrl;
+    authAvatar.hidden = false;
+    authProviderIcon.hidden = true;
+  } else {
+    authAvatar.hidden = true;
+    authAvatar.removeAttribute("src");
+    authProviderIcon.hidden = false;
+    authProviderIcon.className = "ri-account-circle-line";
+  }
+
+  authMenuName.textContent = state.currentUser.displayName || "Google user";
+  authMenuEmail.textContent = state.currentUser.email || "";
 }
 
 function setCloudSyncStatus(message) {
@@ -484,6 +529,7 @@ async function signOutGoogle() {
     return;
   }
 
+  setAuthMenuState(false);
   await state.firebaseAuth.signOut();
 }
 
@@ -1254,11 +1300,39 @@ todayStatsBtn.addEventListener("click", () => setStatsRange("today"));
 weeklyStatsBtn.addEventListener("click", () => setStatsRange("weekly"));
 lifetimeStatsBtn.addEventListener("click", () => setStatsRange("lifetime"));
 resetLifetimeBtn.addEventListener("click", () => resetLifetimeStats());
-googleSignInBtn.addEventListener("click", () => {
+googleSignInBtn.addEventListener("click", (event) => {
+  event.stopPropagation();
+
+  if (state.currentUser) {
+    setAuthMenuState(!state.authMenuOpen);
+    return;
+  }
+
   signInWithGoogle().catch(() => {
     setCloudSyncStatus("Google sign-in failed. Allow popups and try again.");
   });
 });
+
+authMenu.addEventListener("click", (event) => {
+  event.stopPropagation();
+});
+
+document.addEventListener("click", (event) => {
+  if (!state.authMenuOpen) {
+    return;
+  }
+
+  if (!event.target.closest(".auth-fab")) {
+    setAuthMenuState(false);
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && state.authMenuOpen) {
+    setAuthMenuState(false);
+  }
+});
+
 signOutBtn.addEventListener("click", () => {
   signOutGoogle().catch(() => {
     setCloudSyncStatus("Sign-out failed. Please retry.");
