@@ -365,6 +365,8 @@ function updateAuthUI() {
   if (!state.firebaseReady) {
     authStatus.textContent = "Local mode (Firebase not configured yet)";
     googleSignInBtn.disabled = true;
+    googleSignInBtn.setAttribute("aria-label", "Google sign-in unavailable (Firebase not configured)");
+    googleSignInBtn.setAttribute("title", "Google sign-in unavailable (Firebase not configured)");
     signOutBtn.hidden = true;
     return;
   }
@@ -373,6 +375,8 @@ function updateAuthUI() {
     authStatus.textContent = "Local mode (not signed in)";
     googleSignInBtn.disabled = false;
     googleSignInBtn.hidden = false;
+    googleSignInBtn.setAttribute("aria-label", "Sign in with Google");
+    googleSignInBtn.setAttribute("title", "Sign in with Google");
     signOutBtn.hidden = true;
     return;
   }
@@ -380,6 +384,8 @@ function updateAuthUI() {
   authStatus.textContent = `Signed in as ${state.currentUser.displayName || state.currentUser.email || "Google user"}`;
   googleSignInBtn.hidden = true;
   signOutBtn.hidden = false;
+  signOutBtn.setAttribute("aria-label", "Sign out");
+  signOutBtn.setAttribute("title", "Sign out");
 }
 
 function setCloudSyncStatus(message) {

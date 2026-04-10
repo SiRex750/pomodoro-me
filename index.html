@@ -18,16 +18,21 @@
   </head>
   <body>
     <main class="app">
+      <div class="auth-fab" aria-label="Account actions">
+        <button id="googleSignInBtn" class="btn auth-icon-btn" type="button" aria-label="Sign in with Google" title="Sign in with Google">
+          <i class="ri-google-fill" aria-hidden="true"></i>
+        </button>
+        <button id="signOutBtn" class="btn auth-icon-btn" type="button" aria-label="Sign out" title="Sign out" hidden>
+          <i class="ri-logout-box-r-line" aria-hidden="true"></i>
+        </button>
+      </div>
+
       <header class="head">
         <p class="kicker">Focus</p>
         <h1>Pomodoro</h1>
       </header>
 
       <section class="auth-panel" aria-label="Account and sync">
-        <div class="auth-actions">
-          <button id="googleSignInBtn" class="btn auth-btn" type="button">Sign in with Google</button>
-          <button id="signOutBtn" class="btn auth-btn" type="button" hidden>Sign out</button>
-        </div>
         <p id="authStatus" class="hint auth-hint">Local mode (not signed in)</p>
         <p id="cloudSyncStatus" class="hint auth-hint"></p>
       </section>
