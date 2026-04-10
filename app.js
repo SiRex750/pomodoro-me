@@ -24,8 +24,7 @@ const activityToggleBtn = document.getElementById("activityToggleBtn");
 const activityToggleIcon = document.getElementById("activityToggleIcon");
 const activityPanel = document.getElementById("activityPanel");
 const activityDashboardCard = document.getElementById("activityDashboardCard");
-const activityMonthRow = document.getElementById("activityMonthRow");
-const activityHeatmapGrid = document.getElementById("activityHeatmapGrid");
+const activityMonthsGrid = document.getElementById("activityMonthsGrid");
 const activityHeatmapMeta = document.getElementById("activityHeatmapMeta");
 const activitySelectionLabel = document.getElementById("activitySelectionLabel");
 const focusSessionsChart = document.getElementById("focusSessionsChart");
@@ -340,44 +339,52 @@ function humanDay(dayKey) {
   });
 }
 
-function getHeatmapWeeks() {
-  const end = new Date();
-  end.setHours(0, 0, 0, 0);
-  const start = new Date(end);
-  start.setDate(start.getDate() - 90);
+function startOfWeekSunday(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - d.getDay());
+  return d;
+}
 
-  const weeks = [];
-  for (let w = 0; w < 13; w += 1) {
-    const weekStart = new Date(start);
-    weekStart.setDate(start.getDate() + w * 7);
-    const days = [];
-    for (let d = 0; d < 7; d += 1) {
-      const current = new Date(weekStart);
-      current.setDate(weekStart.getDate() + d);
-      const key = toDateKey(current);
-      days.push({ key, ...dailyStatsForKey(key) });
+function getHeatmapMonths() {
+  const months = [];
+  const now = new Date();
+  for (let offset = 2; offset >= 0; offset -= 1) {
+    const monthDate = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+    const monthKey = monthKeyFromDate(monthDate);
+    const firstDay = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+    const lastDay = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+    const firstWeekStart = startOfWeekSunday(firstDay);
+    const lastWeekStart = startOfWeekSunday(lastDay);
+
+    const weeks = [];
+    for (let cursor = new Date(firstWeekStart); cursor <= lastWeekStart; cursor.setDate(cursor.getDate() + 7)) {
+      const weekStart = new Date(cursor);
+      const weekKey = `${monthKey}|${toDateKey(weekStart)}`;
+      const days = [];
+      for (let dayIndex = 0; dayIndex < 7; dayIndex += 1) {
+        const current = new Date(weekStart);
+        current.setDate(weekStart.getDate() + dayIndex);
+        const key = toDateKey(current);
+        const inMonth = current.getMonth() === monthDate.getMonth();
+        days.push({
+          key,
+          inMonth,
+          ...dailyStatsForKey(key),
+        });
+      }
+
+      weeks.push({ weekKey, monthKey, days });
     }
 
-    const middle = parseDateKey(days[3].key);
-    weeks.push({
-      weekKey: days[0].key,
-      monthKey: monthKeyFromDate(middle),
-      days,
+    months.push({
+      monthKey,
+      label: monthDate.toLocaleString(undefined, { month: "long" }),
+      weeks,
     });
   }
 
-  return weeks;
-}
-
-function listMonthSegments(weeks) {
-  const segments = [];
-  for (const week of weeks) {
-    const last = segments[segments.length - 1];
-    if (!last || last.monthKey !== week.monthKey) {
-      segments.push({ monthKey: week.monthKey });
-    }
-  }
-  return segments;
+  return months;
 }
 
 function setActivitySelection(type, key = "") {
@@ -399,9 +406,16 @@ function pointsForMonth(monthKey) {
   return { points, label: `${start.toLocaleString(undefined, { month: "long", year: "numeric" })}` };
 }
 
-function pointsForWeek(weekKey, weeks) {
-  const match = weeks.find((week) => week.weekKey === weekKey);
-  const days = match ? match.days : [];
+function pointsForWeek(weekKey, months) {
+  let days = [];
+  for (const month of months) {
+    const week = month.weeks.find((entry) => entry.weekKey === weekKey);
+    if (week) {
+      days = week.days.filter((entry) => entry.inMonth);
+      break;
+    }
+  }
+
   const points = days.map((entry) => ({
     label: parseDateKey(entry.key).toLocaleDateString(undefined, { weekday: "short" }),
     ...entry,
@@ -454,13 +468,13 @@ function pointsForLifetime() {
   return { points, label: "Lifetime" };
 }
 
-function currentSelectionSeries(weeks) {
+function currentSelectionSeries(months) {
   if (state.activitySelectionType === "day" && state.activitySelectionKey) {
     return pointsForDay(state.activitySelectionKey);
   }
 
   if (state.activitySelectionType === "week" && state.activitySelectionKey) {
-    return pointsForWeek(state.activitySelectionKey, weeks);
+    return pointsForWeek(state.activitySelectionKey, months);
   }
 
   if (state.activitySelectionType === "month" && state.activitySelectionKey) {
@@ -588,66 +602,62 @@ function heatmapLevel(value, maxValue) {
   return 4;
 }
 
-function renderActivityBars(container, series, metric, isTimeGraph = false) {
-  container.innerHTML = "";
-  const max = Math.max(1, ...series.map((entry) => entry[metric]));
-
-  for (const entry of series) {
-    const value = entry[metric];
-    const heightPercent = Math.max(6, Math.round((value / max) * 100));
-    const bar = document.createElement("div");
-    bar.className = `activity-bar${isTimeGraph ? " activity-bar-time" : ""}`;
-    bar.style.height = `${heightPercent}%`;
-
-    const labelValue = isTimeGraph
-      ? `${Math.round(entry.pomodoroMs / 60000)} min`
-      : `${entry.focusSessions} sessions`;
-    bar.title = `${entry.key}: ${labelValue}`;
-    container.appendChild(bar);
-  }
-}
-
 function renderActivityDashboard() {
-  const weeks = getHeatmapWeeks();
-  const allDays = weeks.flatMap((week) => week.days);
+  const months = getHeatmapMonths();
+  const allDays = months.flatMap((month) => month.weeks.flatMap((week) => week.days.filter((day) => day.inMonth)));
   const maxSessions = Math.max(1, ...allDays.map((entry) => entry.focusSessions));
 
-  activityMonthRow.innerHTML = "";
-  const monthSegments = listMonthSegments(weeks);
-  for (const segment of monthSegments) {
+  activityMonthsGrid.innerHTML = "";
+  for (const month of months) {
+    const monthPanel = document.createElement("section");
+    monthPanel.className = "activity-month-panel";
+    if (state.activitySelectionType === "month" && state.activitySelectionKey === month.monthKey) {
+      monthPanel.classList.add("is-active");
+    }
+
     const monthBtn = document.createElement("button");
+    monthBtn.type = "button";
     monthBtn.className = "activity-month-btn";
-    monthBtn.textContent = humanMonth(segment.monthKey);
-    monthBtn.dataset.month = segment.monthKey;
-    if (state.activitySelectionType === "month" && state.activitySelectionKey === segment.monthKey) {
-      monthBtn.classList.add("is-active");
-    }
-    activityMonthRow.appendChild(monthBtn);
-  }
+    monthBtn.dataset.month = month.monthKey;
+    monthBtn.textContent = month.label;
+    monthPanel.appendChild(monthBtn);
 
-  activityHeatmapGrid.innerHTML = "";
-  for (const week of weeks) {
-    const weekColumn = document.createElement("div");
-    weekColumn.className = "activity-week-column";
-    weekColumn.dataset.week = week.weekKey;
-    if (state.activitySelectionType === "week" && state.activitySelectionKey === week.weekKey) {
-      weekColumn.classList.add("is-active");
-    }
+    const weeksWrap = document.createElement("div");
+    weeksWrap.className = "activity-month-weeks";
 
-    for (const day of week.days) {
-      const level = heatmapLevel(day.focusSessions, maxSessions);
-      const dayCell = document.createElement("button");
-      dayCell.type = "button";
-      dayCell.className = `activity-day-cell level-${level}`;
-      dayCell.dataset.key = day.key;
-      dayCell.title = `${day.key}: ${day.focusSessions} sessions, ${Math.round(day.pomodoroMs / 60000)} min`;
-      if (state.activitySelectionType === "day" && state.activitySelectionKey === day.key) {
-        dayCell.classList.add("is-active");
+    for (const week of month.weeks) {
+      const weekColumn = document.createElement("div");
+      weekColumn.className = "activity-week-column";
+      weekColumn.dataset.week = week.weekKey;
+      if (state.activitySelectionType === "week" && state.activitySelectionKey === week.weekKey) {
+        weekColumn.classList.add("is-active");
       }
-      weekColumn.appendChild(dayCell);
+
+      for (const day of week.days) {
+        if (!day.inMonth) {
+          const empty = document.createElement("div");
+          empty.className = "activity-day-empty";
+          weekColumn.appendChild(empty);
+          continue;
+        }
+
+        const level = heatmapLevel(day.focusSessions, maxSessions);
+        const dayCell = document.createElement("button");
+        dayCell.type = "button";
+        dayCell.className = `activity-day-cell level-${level}`;
+        dayCell.dataset.key = day.key;
+        dayCell.title = `${day.key}: ${day.focusSessions} sessions, ${Math.round(day.pomodoroMs / 60000)} min`;
+        if (state.activitySelectionType === "day" && state.activitySelectionKey === day.key) {
+          dayCell.classList.add("is-active");
+        }
+        weekColumn.appendChild(dayCell);
+      }
+
+      weeksWrap.appendChild(weekColumn);
     }
 
-    activityHeatmapGrid.appendChild(weekColumn);
+    monthPanel.appendChild(weeksWrap);
+    activityMonthsGrid.appendChild(monthPanel);
   }
 
   const totalSessions = allDays.reduce((sum, entry) => sum + entry.focusSessions, 0);
@@ -656,7 +666,7 @@ function renderActivityDashboard() {
 
   activityDashboardCard.classList.toggle("is-lifetime", state.activitySelectionType === "lifetime");
 
-  const selected = currentSelectionSeries(weeks);
+  const selected = currentSelectionSeries(months);
   const selectionSessions = selected.points.reduce((sum, point) => sum + (point.focusSessions || 0), 0);
   const selectionMs = selected.points.reduce((sum, point) => sum + (point.pomodoroMs || 0), 0);
   activitySelectionLabel.textContent = `${selected.label} - ${selectionSessions} sessions - ${formatTrackedDuration(selectionMs)}`;
@@ -1691,17 +1701,14 @@ resetBtn.addEventListener("click", () => resetTimer());
 pipBtn.addEventListener("click", () => togglePiP());
 activityToggleBtn.addEventListener("click", () => setActivityPanelState(!state.activityPanelOpen));
 
-activityMonthRow.addEventListener("click", (event) => {
+activityMonthsGrid.addEventListener("click", (event) => {
   const monthButton = event.target.closest(".activity-month-btn");
-  if (!monthButton) {
+  if (monthButton) {
+    event.stopPropagation();
+    setActivitySelection("month", monthButton.dataset.month || "");
     return;
   }
 
-  event.stopPropagation();
-  setActivitySelection("month", monthButton.dataset.month || "");
-});
-
-activityHeatmapGrid.addEventListener("click", (event) => {
   const dayButton = event.target.closest(".activity-day-cell");
   if (dayButton) {
     event.stopPropagation();

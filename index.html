@@ -103,8 +103,18 @@
         <div id="activityPanel" class="activity-panel" hidden>
           <article id="activityDashboardCard" class="activity-card activity-dashboard-card" aria-label="Focus activity heatmap">
             <p class="stat-label">Focus Activity</p>
-            <div id="activityMonthRow" class="activity-month-row" aria-label="Month shortcuts"></div>
-            <div id="activityHeatmapGrid" class="activity-heatmap-grid"></div>
+            <div class="activity-heatmap-shell">
+              <div class="activity-weekday-rail" aria-hidden="true">
+                <span>S</span>
+                <span>M</span>
+                <span>T</span>
+                <span>W</span>
+                <span>T</span>
+                <span>F</span>
+                <span>S</span>
+              </div>
+              <div id="activityMonthsGrid" class="activity-months-grid"></div>
+            </div>
             <p id="activityHeatmapMeta" class="activity-meta"></p>
           </article>
 
