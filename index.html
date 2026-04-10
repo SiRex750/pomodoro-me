@@ -88,44 +88,6 @@
         </div>
       </section>
 
-      <section class="stats" aria-label="Pomodoro usage stats">
-        <button
-          id="activityToggleBtn"
-          class="btn activity-toggle"
-          type="button"
-          aria-expanded="false"
-          aria-controls="activityPanel"
-        >
-          Activity Dashboard
-          <i id="activityToggleIcon" class="ri-arrow-down-s-line" aria-hidden="true"></i>
-        </button>
-
-        <div id="activityPanel" class="activity-panel" hidden>
-          <article id="activityDashboardCard" class="activity-card activity-dashboard-card" aria-label="Focus activity heatmap">
-            <p class="stat-label">Focus Activity</p>
-            <div class="activity-heatmap-shell">
-              <div class="activity-weekday-rail" aria-hidden="true">
-                <span>S</span>
-                <span>M</span>
-                <span>T</span>
-                <span>W</span>
-                <span>T</span>
-                <span>F</span>
-                <span>S</span>
-              </div>
-              <div id="activityMonthsGrid" class="activity-months-grid"></div>
-            </div>
-            <p id="activityHeatmapMeta" class="activity-meta"></p>
-          </article>
-
-          <article class="activity-card activity-graph-card" aria-label="Activity graphs">
-            <p id="activitySelectionLabel" class="activity-selection-label">Lifetime</p>
-            <svg id="focusSessionsChart" class="activity-chart" viewBox="0 0 600 220" preserveAspectRatio="none"></svg>
-            <svg id="focusTimeChart" class="activity-chart" viewBox="0 0 600 220" preserveAspectRatio="none"></svg>
-          </article>
-        </div>
-      </section>
-
       <section id="settingsPanel" class="settings-panel" hidden>
         <section class="settings" aria-label="Timer settings">
           <label>
@@ -153,6 +115,42 @@
 
       <p id="supportHint" class="hint"></p>
     </main>
+
+    <button id="activityEdgeToggle" class="btn activity-edge-toggle" type="button" aria-expanded="false" aria-controls="activityDrawer">Activity</button>
+
+    <aside id="activityDrawer" class="activity-drawer" aria-label="Activity dashboard">
+      <div class="activity-drawer-head">
+        <p class="activity-drawer-title">Activity</p>
+        <button id="activityDrawerClose" class="btn icon-btn" type="button" aria-label="Close activity drawer" title="Close activity drawer">
+          <i class="ri-close-line" aria-hidden="true"></i>
+        </button>
+      </div>
+
+      <div class="activity-panel">
+        <article id="activityDashboardCard" class="activity-card activity-dashboard-card" aria-label="Focus activity heatmap">
+          <p class="stat-label">Focus Activity</p>
+          <div class="activity-heatmap-shell">
+            <div class="activity-weekday-rail" aria-hidden="true">
+              <span>S</span>
+              <span>M</span>
+              <span>T</span>
+              <span>W</span>
+              <span>T</span>
+              <span>F</span>
+              <span>S</span>
+            </div>
+            <div id="activityMonthsGrid" class="activity-months-grid"></div>
+          </div>
+          <p id="activityHeatmapMeta" class="activity-meta"></p>
+        </article>
+
+        <article class="activity-card activity-graph-card" aria-label="Activity graphs">
+          <p id="activitySelectionLabel" class="activity-selection-label">Lifetime</p>
+          <svg id="focusSessionsChart" class="activity-chart" viewBox="0 0 600 220" preserveAspectRatio="none"></svg>
+          <svg id="focusTimeChart" class="activity-chart" viewBox="0 0 600 220" preserveAspectRatio="none"></svg>
+        </article>
+      </div>
+    </aside>
 
     <video id="pipVideo" playsinline controls hidden></video>
     <canvas id="pipCanvas" width="640" height="360" hidden></canvas>

@@ -20,9 +20,9 @@ const themeSolidBtn = document.getElementById("themeSolidBtn");
 const themePlanetsBtn = document.getElementById("themePlanetsBtn");
 const themeMarbleBtn = document.getElementById("themeMarbleBtn");
 const supportHint = document.getElementById("supportHint");
-const activityToggleBtn = document.getElementById("activityToggleBtn");
-const activityToggleIcon = document.getElementById("activityToggleIcon");
-const activityPanel = document.getElementById("activityPanel");
+const activityEdgeToggle = document.getElementById("activityEdgeToggle");
+const activityDrawer = document.getElementById("activityDrawer");
+const activityDrawerClose = document.getElementById("activityDrawerClose");
 const activityDashboardCard = document.getElementById("activityDashboardCard");
 const activityMonthsGrid = document.getElementById("activityMonthsGrid");
 const activityHeatmapMeta = document.getElementById("activityHeatmapMeta");
@@ -70,7 +70,7 @@ const THEME_IMAGE_SETS = {
 
 const USAGE_STATS_KEY = "pomodoroUsageStatsV1";
 const PIP_STICKY_KEY = "pomodoroPiPStickyV1";
-const ACTIVITY_PANEL_OPEN_KEY = "pomodoroActivityPanelOpenV1";
+const ACTIVITY_PANEL_OPEN_KEY = "pomodoroActivityDrawerOpenV1";
 const STATS_DOC_VERSION = 1;
 const CLOUD_SYNC_DEBOUNCE_MS = 1200;
 
@@ -126,7 +126,7 @@ const state = {
   lastCloudSyncAt: 0,
   authMenuOpen: false,
   authSyncing: false,
-  activityPanelOpen: true,
+  activityDrawerOpen: false,
   activitySelectionType: "lifetime",
   activitySelectionKey: "",
 };
@@ -174,6 +174,18 @@ function normalizeStatsByDay(input) {
     return {};
   }
 
+  const normalizeHourArray = (value) => {
+    const base = Array.from({ length: 24 }, () => 0);
+    if (!Array.isArray(value)) {
+      return base;
+    }
+
+    return base.map((_, hour) => {
+      const current = value[hour];
+      return Number.isFinite(current) ? Math.max(0, Math.floor(current)) : 0;
+    });
+  };
+
   const next = {};
   for (const [key, value] of Object.entries(input)) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(key) || !value || typeof value !== "object") {
@@ -183,6 +195,8 @@ function normalizeStatsByDay(input) {
     next[key] = {
       focusSessions: Number.isFinite(value.focusSessions) ? Math.max(0, Math.floor(value.focusSessions)) : 0,
       pomodoroMs: Number.isFinite(value.pomodoroMs) ? Math.max(0, Math.floor(value.pomodoroMs)) : 0,
+      focusSessionsByHour: normalizeHourArray(value.focusSessionsByHour),
+      pomodoroMsByHour: normalizeHourArray(value.pomodoroMsByHour),
     };
   }
 
@@ -192,7 +206,21 @@ function normalizeStatsByDay(input) {
 function ensureTodayStatsBucket() {
   const key = todayKey();
   if (!state.statsByDay[key]) {
-    state.statsByDay[key] = { focusSessions: 0, pomodoroMs: 0 };
+    state.statsByDay[key] = {
+      focusSessions: 0,
+      pomodoroMs: 0,
+      focusSessionsByHour: Array.from({ length: 24 }, () => 0),
+      pomodoroMsByHour: Array.from({ length: 24 }, () => 0),
+    };
+    return;
+  }
+
+  if (!Array.isArray(state.statsByDay[key].focusSessionsByHour) || state.statsByDay[key].focusSessionsByHour.length !== 24) {
+    state.statsByDay[key].focusSessionsByHour = Array.from({ length: 24 }, () => 0);
+  }
+
+  if (!Array.isArray(state.statsByDay[key].pomodoroMsByHour) || state.statsByDay[key].pomodoroMsByHour.length !== 24) {
+    state.statsByDay[key].pomodoroMsByHour = Array.from({ length: 24 }, () => 0);
   }
 }
 
@@ -264,26 +292,36 @@ function setPiPStickyPreference(value) {
 }
 
 function loadActivityPanelPreference() {
-  state.activityPanelOpen = localStorage.getItem(ACTIVITY_PANEL_OPEN_KEY) !== "0";
+  state.activityDrawerOpen = localStorage.getItem(ACTIVITY_PANEL_OPEN_KEY) === "1";
 }
 
 function setActivityPanelState(open) {
-  state.activityPanelOpen = open;
+  state.activityDrawerOpen = open;
   localStorage.setItem(ACTIVITY_PANEL_OPEN_KEY, open ? "1" : "0");
-  activityPanel.hidden = !open;
-  activityToggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
-  activityToggleIcon.className = open ? "ri-arrow-up-s-line" : "ri-arrow-down-s-line";
+  activityDrawer.classList.toggle("is-open", open);
+  activityEdgeToggle.setAttribute("aria-expanded", open ? "true" : "false");
 }
 
 function dailyStatsForKey(key) {
   const bucket = state.statsByDay[key];
   if (!bucket) {
-    return { focusSessions: 0, pomodoroMs: 0 };
+    return {
+      focusSessions: 0,
+      pomodoroMs: 0,
+      focusSessionsByHour: Array.from({ length: 24 }, () => 0),
+      pomodoroMsByHour: Array.from({ length: 24 }, () => 0),
+    };
   }
 
   return {
     focusSessions: Math.max(0, Math.floor(bucket.focusSessions || 0)),
     pomodoroMs: Math.max(0, Math.floor(bucket.pomodoroMs || 0)),
+    focusSessionsByHour: Array.isArray(bucket.focusSessionsByHour) && bucket.focusSessionsByHour.length === 24
+      ? bucket.focusSessionsByHour
+      : Array.from({ length: 24 }, () => 0),
+    pomodoroMsByHour: Array.isArray(bucket.pomodoroMsByHour) && bucket.pomodoroMsByHour.length === 24
+      ? bucket.pomodoroMsByHour
+      : Array.from({ length: 24 }, () => 0),
   };
 }
 
@@ -459,13 +497,9 @@ function pointsForDay(dayKey) {
   const points = Array.from({ length: 24 }, (_, hour) => ({
     label: `${String(hour).padStart(2, "0")}:00`,
     key: `${dayKey}T${String(hour).padStart(2, "0")}`,
-    focusSessions: 0,
-    pomodoroMs: 0,
+    focusSessions: entry.focusSessionsByHour[hour] || 0,
+    pomodoroMs: entry.pomodoroMsByHour[hour] || 0,
   }));
-
-  // We currently persist day-level totals, so we place totals at noon for hourly charting.
-  points[12].focusSessions = entry.focusSessions;
-  points[12].pomodoroMs = entry.pomodoroMs;
 
   return {
     points,
@@ -584,14 +618,25 @@ function renderMetricChart(svg, points, metricKey, yTitle, xTitle, barClass) {
     svg.appendChild(rect);
   });
 
-  const firstLabel = points[0]?.label || "";
-  const midLabel = points[Math.floor((points.length - 1) / 2)]?.label || "";
-  const lastLabel = points[points.length - 1]?.label || "";
-  const xLabels = [
-    { x: margin.left, value: firstLabel, anchor: "start" },
-    { x: margin.left + plotW / 2, value: midLabel, anchor: "middle" },
-    { x: margin.left + plotW, value: lastLabel, anchor: "end" },
-  ];
+  let labelIndices = [0, Math.floor((points.length - 1) / 2), points.length - 1];
+  if (points.length === 24) {
+    labelIndices = [0, 6, 12, 18, 23];
+  } else if (points.length <= 8) {
+    labelIndices = Array.from({ length: points.length }, (_, idx) => idx);
+  } else if (points.length <= 14) {
+    labelIndices = [0, 2, 4, 6, 8, 10, 12, points.length - 1].filter((index, pos, arr) => index < points.length && arr.indexOf(index) === pos);
+  }
+
+  const xLabels = labelIndices.map((index) => {
+    const isFirst = index === 0;
+    const isLast = index === points.length - 1;
+    const x = margin.left + (points.length <= 1 ? 0 : (index / (points.length - 1)) * plotW);
+    return {
+      x,
+      value: points[index]?.label || "",
+      anchor: isFirst ? "start" : isLast ? "end" : "middle",
+    };
+  });
 
   for (const label of xLabels) {
     const t = svgNode("text", {
@@ -758,7 +803,10 @@ function addUsageElapsed(nowMs = Date.now()) {
   state.lastTrackedAtMs = nowMs;
   state.lifetimePomodoroMs += delta;
   ensureTodayStatsBucket();
-  state.statsByDay[todayKey()].pomodoroMs += delta;
+  const dayKey = todayKey();
+  state.statsByDay[dayKey].pomodoroMs += delta;
+  const hour = new Date(nowMs).getHours();
+  state.statsByDay[dayKey].pomodoroMsByHour[hour] += delta;
   state.unsavedUsageMs += delta;
 
   if (state.unsavedUsageMs >= 5000) {
@@ -1474,7 +1522,9 @@ function switchMode(recordHistory = true) {
     state.completedFocusSessions += 1;
     state.lifetimeFocusSessions += 1;
     ensureTodayStatsBucket();
-    state.statsByDay[todayKey()].focusSessions += 1;
+    const dayKey = todayKey();
+    state.statsByDay[dayKey].focusSessions += 1;
+    state.statsByDay[dayKey].focusSessionsByHour[new Date().getHours()] += 1;
     saveUsageStats();
     state.mode = state.completedFocusSessions % 4 === 0 ? "longBreak" : "shortBreak";
   } else {
@@ -1754,7 +1804,8 @@ settingsBtn.addEventListener("click", () => setSettingsPanelState(settingsPanel.
 
 resetBtn.addEventListener("click", () => resetTimer());
 pipBtn.addEventListener("click", () => togglePiP());
-activityToggleBtn.addEventListener("click", () => setActivityPanelState(!state.activityPanelOpen));
+activityEdgeToggle.addEventListener("click", () => setActivityPanelState(!state.activityDrawerOpen));
+activityDrawerClose.addEventListener("click", () => setActivityPanelState(false));
 
 activityMonthsGrid.addEventListener("click", (event) => {
   const monthButton = event.target.closest(".activity-month-btn");
@@ -1826,6 +1877,10 @@ document.addEventListener("click", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && state.activityDrawerOpen) {
+    setActivityPanelState(false);
+  }
+
   if (event.key === "Escape" && state.authMenuOpen) {
     setAuthMenuState(false);
   }
@@ -1948,6 +2003,6 @@ loadPiPStickyPreference();
 loadActivityPanelPreference();
 setupFirebaseAuth();
 setupMediaSessionHandlers();
-setActivityPanelState(state.activityPanelOpen);
+setActivityPanelState(state.activityDrawerOpen);
 updateAuthUI();
 updateUI();
