@@ -20,21 +20,16 @@ const themeSolidBtn = document.getElementById("themeSolidBtn");
 const themePlanetsBtn = document.getElementById("themePlanetsBtn");
 const themeMarbleBtn = document.getElementById("themeMarbleBtn");
 const supportHint = document.getElementById("supportHint");
-const focusSessionsCount = document.getElementById("focusSessionsCount");
-const totalPomodoroTime = document.getElementById("totalPomodoroTime");
-const sessionsStatLabel = document.getElementById("sessionsStatLabel");
-const timeStatLabel = document.getElementById("timeStatLabel");
 const activityToggleBtn = document.getElementById("activityToggleBtn");
 const activityToggleIcon = document.getElementById("activityToggleIcon");
 const activityPanel = document.getElementById("activityPanel");
+const activityDashboardCard = document.getElementById("activityDashboardCard");
+const activityMonthRow = document.getElementById("activityMonthRow");
 const activityHeatmapGrid = document.getElementById("activityHeatmapGrid");
 const activityHeatmapMeta = document.getElementById("activityHeatmapMeta");
-const activityTimeGraph = document.getElementById("activityTimeGraph");
-const activitySessionsGraph = document.getElementById("activitySessionsGraph");
-const todayStatsBtn = document.getElementById("todayStatsBtn");
-const weeklyStatsBtn = document.getElementById("weeklyStatsBtn");
-const lifetimeStatsBtn = document.getElementById("lifetimeStatsBtn");
-const resetLifetimeBtn = document.getElementById("resetLifetimeBtn");
+const activitySelectionLabel = document.getElementById("activitySelectionLabel");
+const focusSessionsChart = document.getElementById("focusSessionsChart");
+const focusTimeChart = document.getElementById("focusTimeChart");
 const googleSignInBtn = document.getElementById("googleSignInBtn");
 const authProviderIcon = document.getElementById("authProviderIcon");
 const authAvatar = document.getElementById("authAvatar");
@@ -76,7 +71,6 @@ const THEME_IMAGE_SETS = {
 
 const USAGE_STATS_KEY = "pomodoroUsageStatsV1";
 const PIP_STICKY_KEY = "pomodoroPiPStickyV1";
-const STATS_RANGE_KEY = "pomodoroStatsRangeV1";
 const ACTIVITY_PANEL_OPEN_KEY = "pomodoroActivityPanelOpenV1";
 const STATS_DOC_VERSION = 1;
 const CLOUD_SYNC_DEBOUNCE_MS = 1200;
@@ -121,7 +115,6 @@ const state = {
   lifetimeFocusSessions: 0,
   lifetimePomodoroMs: 0,
   unsavedUsageMs: 0,
-  statsRange: "today",
   statsByDay: {},
   usageLastUpdatedAt: 0,
   authReady: false,
@@ -135,6 +128,8 @@ const state = {
   authMenuOpen: false,
   authSyncing: false,
   activityPanelOpen: true,
+  activitySelectionType: "lifetime",
+  activitySelectionKey: "",
 };
 
 function setAuthMenuState(open) {
@@ -245,13 +240,6 @@ function loadUsageStats() {
   }
 }
 
-function loadStatsRangePreference() {
-  const saved = localStorage.getItem(STATS_RANGE_KEY);
-  if (["today", "weekly", "lifetime"].includes(saved)) {
-    state.statsRange = saved;
-  }
-}
-
 function saveUsageStats() {
   state.usageLastUpdatedAt = Date.now();
   localStorage.setItem(
@@ -288,57 +276,6 @@ function setActivityPanelState(open) {
   activityToggleIcon.className = open ? "ri-arrow-up-s-line" : "ri-arrow-down-s-line";
 }
 
-function setStatsRange(range) {
-  if (!["today", "weekly", "lifetime"].includes(range)) {
-    return;
-  }
-
-  state.statsRange = range;
-  localStorage.setItem(STATS_RANGE_KEY, range);
-  updateUI();
-}
-
-function aggregateStats(range) {
-  if (range === "lifetime") {
-    return {
-      sessions: state.lifetimeFocusSessions,
-      pomodoroMs: state.lifetimePomodoroMs,
-      sessionsLabel: "Lifetime Focus Sessions",
-      timeLabel: "Lifetime Pomodoro Time",
-    };
-  }
-
-  if (range === "weekly") {
-    const keys = getRecentDayKeys(7);
-    let sessions = 0;
-    let pomodoroMs = 0;
-    for (const key of keys) {
-      const bucket = state.statsByDay[key];
-      if (!bucket) {
-        continue;
-      }
-
-      sessions += bucket.focusSessions;
-      pomodoroMs += bucket.pomodoroMs;
-    }
-
-    return {
-      sessions,
-      pomodoroMs,
-      sessionsLabel: "Weekly Focus Sessions",
-      timeLabel: "Weekly Pomodoro Time",
-    };
-  }
-
-  const bucket = state.statsByDay[todayKey()] || { focusSessions: 0, pomodoroMs: 0 };
-  return {
-    sessions: bucket.focusSessions,
-    pomodoroMs: bucket.pomodoroMs,
-    sessionsLabel: "Today Focus Sessions",
-    timeLabel: "Today Pomodoro Time",
-  };
-}
-
 function dailyStatsForKey(key) {
   const bucket = state.statsByDay[key];
   if (!bucket) {
@@ -368,6 +305,269 @@ function getActivitySeries(days) {
     series.push({ key, ...dailyStatsForKey(key) });
   }
   return series;
+}
+
+function toDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateKey(key) {
+  const [year, month, day] = key.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function monthKeyFromDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+}
+
+function humanMonth(monthKey) {
+  const [year, month] = monthKey.split("-").map(Number);
+  return new Date(year, month - 1, 1).toLocaleString(undefined, {
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function humanDay(dayKey) {
+  return parseDateKey(dayKey).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function getHeatmapWeeks() {
+  const end = new Date();
+  end.setHours(0, 0, 0, 0);
+  const start = new Date(end);
+  start.setDate(start.getDate() - 90);
+
+  const weeks = [];
+  for (let w = 0; w < 13; w += 1) {
+    const weekStart = new Date(start);
+    weekStart.setDate(start.getDate() + w * 7);
+    const days = [];
+    for (let d = 0; d < 7; d += 1) {
+      const current = new Date(weekStart);
+      current.setDate(weekStart.getDate() + d);
+      const key = toDateKey(current);
+      days.push({ key, ...dailyStatsForKey(key) });
+    }
+
+    const middle = parseDateKey(days[3].key);
+    weeks.push({
+      weekKey: days[0].key,
+      monthKey: monthKeyFromDate(middle),
+      days,
+    });
+  }
+
+  return weeks;
+}
+
+function listMonthSegments(weeks) {
+  const segments = [];
+  for (const week of weeks) {
+    const last = segments[segments.length - 1];
+    if (!last || last.monthKey !== week.monthKey) {
+      segments.push({ monthKey: week.monthKey });
+    }
+  }
+  return segments;
+}
+
+function setActivitySelection(type, key = "") {
+  state.activitySelectionType = type;
+  state.activitySelectionKey = key;
+  renderActivityDashboard();
+}
+
+function pointsForMonth(monthKey) {
+  const [year, month] = monthKey.split("-").map(Number);
+  const start = new Date(year, month - 1, 1);
+  const end = new Date(year, month, 0);
+  const points = [];
+  for (let day = 1; day <= end.getDate(); day += 1) {
+    const current = new Date(year, month - 1, day);
+    const key = toDateKey(current);
+    points.push({ label: String(day), key, ...dailyStatsForKey(key) });
+  }
+  return { points, label: `${start.toLocaleString(undefined, { month: "long", year: "numeric" })}` };
+}
+
+function pointsForWeek(weekKey, weeks) {
+  const match = weeks.find((week) => week.weekKey === weekKey);
+  const days = match ? match.days : [];
+  const points = days.map((entry) => ({
+    label: parseDateKey(entry.key).toLocaleDateString(undefined, { weekday: "short" }),
+    ...entry,
+  }));
+  const label = days.length
+    ? `Week of ${humanDay(days[0].key)}`
+    : "Week";
+  return { points, label };
+}
+
+function pointsForDay(dayKey) {
+  const entry = dailyStatsForKey(dayKey);
+  return {
+    points: [{ label: humanDay(dayKey), key: dayKey, ...entry }],
+    label: humanDay(dayKey),
+  };
+}
+
+function pointsForLifetime() {
+  const keys = Object.keys(state.statsByDay).sort();
+  const monthMap = new Map();
+  for (const key of keys) {
+    const mk = key.slice(0, 7);
+    if (!monthMap.has(mk)) {
+      monthMap.set(mk, { sessions: 0, pomodoroMs: 0 });
+    }
+    const bucket = monthMap.get(mk);
+    const day = dailyStatsForKey(key);
+    bucket.sessions += day.focusSessions;
+    bucket.pomodoroMs += day.pomodoroMs;
+  }
+
+  if (monthMap.size === 0) {
+    const fallback = [];
+    for (let i = 2; i >= 0; i -= 1) {
+      const date = new Date();
+      date.setMonth(date.getMonth() - i, 1);
+      fallback.push({ label: date.toLocaleString(undefined, { month: "short" }), focusSessions: 0, pomodoroMs: 0 });
+    }
+    return { points: fallback, label: "Lifetime" };
+  }
+
+  const points = Array.from(monthMap.entries()).map(([monthKey, values]) => ({
+    label: monthKey.slice(5),
+    key: monthKey,
+    focusSessions: values.sessions,
+    pomodoroMs: values.pomodoroMs,
+  }));
+
+  return { points, label: "Lifetime" };
+}
+
+function currentSelectionSeries(weeks) {
+  if (state.activitySelectionType === "day" && state.activitySelectionKey) {
+    return pointsForDay(state.activitySelectionKey);
+  }
+
+  if (state.activitySelectionType === "week" && state.activitySelectionKey) {
+    return pointsForWeek(state.activitySelectionKey, weeks);
+  }
+
+  if (state.activitySelectionType === "month" && state.activitySelectionKey) {
+    return pointsForMonth(state.activitySelectionKey);
+  }
+
+  return pointsForLifetime();
+}
+
+function svgNode(name, attrs = {}) {
+  const node = document.createElementNS("http://www.w3.org/2000/svg", name);
+  for (const [key, value] of Object.entries(attrs)) {
+    node.setAttribute(key, String(value));
+  }
+  return node;
+}
+
+function renderMetricChart(svg, points, metricKey, yTitle, xTitle, barClass) {
+  svg.innerHTML = "";
+  const width = 600;
+  const height = 220;
+  const margin = { top: 16, right: 14, bottom: 36, left: 44 };
+  const plotW = width - margin.left - margin.right;
+  const plotH = height - margin.top - margin.bottom;
+  const maxValue = Math.max(1, ...points.map((point) => point[metricKey] || 0));
+
+  svg.appendChild(svgNode("line", {
+    x1: margin.left,
+    y1: margin.top,
+    x2: margin.left,
+    y2: margin.top + plotH,
+    class: "axis-line",
+  }));
+
+  svg.appendChild(svgNode("line", {
+    x1: margin.left,
+    y1: margin.top + plotH,
+    x2: margin.left + plotW,
+    y2: margin.top + plotH,
+    class: "axis-line",
+  }));
+
+  const ticks = [0, Math.round(maxValue / 2), maxValue];
+  for (const tick of ticks) {
+    const y = margin.top + plotH - (tick / maxValue) * plotH;
+    svg.appendChild(svgNode("line", {
+      x1: margin.left,
+      y1: y,
+      x2: margin.left + plotW,
+      y2: y,
+      class: "tick-line",
+    }));
+    const tickText = svgNode("text", { x: margin.left - 6, y: y + 4, class: "tick-label", "text-anchor": "end" });
+    tickText.textContent = tick.toString();
+    svg.appendChild(tickText);
+  }
+
+  const slotW = plotW / Math.max(points.length, 1);
+  const barW = Math.max(4, Math.min(18, slotW * 0.62));
+  points.forEach((point, index) => {
+    const value = point[metricKey] || 0;
+    const h = (value / maxValue) * plotH;
+    const x = margin.left + index * slotW + (slotW - barW) / 2;
+    const y = margin.top + plotH - h;
+    const rect = svgNode("rect", { x, y, width: barW, height: Math.max(1, h), rx: 3, class: barClass });
+    rect.appendChild(document.createTextNode(""));
+    svg.appendChild(rect);
+  });
+
+  const firstLabel = points[0]?.label || "";
+  const midLabel = points[Math.floor((points.length - 1) / 2)]?.label || "";
+  const lastLabel = points[points.length - 1]?.label || "";
+  const xLabels = [
+    { x: margin.left, value: firstLabel, anchor: "start" },
+    { x: margin.left + plotW / 2, value: midLabel, anchor: "middle" },
+    { x: margin.left + plotW, value: lastLabel, anchor: "end" },
+  ];
+
+  for (const label of xLabels) {
+    const t = svgNode("text", {
+      x: label.x,
+      y: margin.top + plotH + 16,
+      class: "tick-label",
+      "text-anchor": label.anchor,
+    });
+    t.textContent = label.value;
+    svg.appendChild(t);
+  }
+
+  const yAxisTitle = svgNode("text", {
+    x: 14,
+    y: margin.top + plotH / 2,
+    class: "axis-label",
+    transform: `rotate(-90 14 ${margin.top + plotH / 2})`,
+    "text-anchor": "middle",
+  });
+  yAxisTitle.textContent = yTitle;
+  svg.appendChild(yAxisTitle);
+
+  const xAxisTitle = svgNode("text", {
+    x: margin.left + plotW / 2,
+    y: height - 8,
+    class: "axis-label",
+    "text-anchor": "middle",
+  });
+  xAxisTitle.textContent = xTitle;
+  svg.appendChild(xAxisTitle);
 }
 
 function heatmapLevel(value, maxValue) {
@@ -408,25 +608,80 @@ function renderActivityBars(container, series, metric, isTimeGraph = false) {
 }
 
 function renderActivityDashboard() {
-  const heatmapSeries = getActivitySeries(84);
-  const graphSeries = getActivitySeries(14);
-  const maxSessions = Math.max(1, ...heatmapSeries.map((entry) => entry.focusSessions));
+  const weeks = getHeatmapWeeks();
+  const allDays = weeks.flatMap((week) => week.days);
+  const maxSessions = Math.max(1, ...allDays.map((entry) => entry.focusSessions));
 
-  activityHeatmapGrid.innerHTML = "";
-  for (const entry of heatmapSeries) {
-    const cell = document.createElement("div");
-    const level = heatmapLevel(entry.focusSessions, maxSessions);
-    cell.className = `activity-cell level-${level}`;
-    cell.title = `${entry.key}: ${entry.focusSessions} sessions, ${Math.round(entry.pomodoroMs / 60000)} min`;
-    activityHeatmapGrid.appendChild(cell);
+  activityMonthRow.innerHTML = "";
+  const monthSegments = listMonthSegments(weeks);
+  for (const segment of monthSegments) {
+    const monthBtn = document.createElement("button");
+    monthBtn.className = "activity-month-btn";
+    monthBtn.textContent = humanMonth(segment.monthKey);
+    monthBtn.dataset.month = segment.monthKey;
+    if (state.activitySelectionType === "month" && state.activitySelectionKey === segment.monthKey) {
+      monthBtn.classList.add("is-active");
+    }
+    activityMonthRow.appendChild(monthBtn);
   }
 
-  const totalSessions = heatmapSeries.reduce((sum, entry) => sum + entry.focusSessions, 0);
-  const totalMs = heatmapSeries.reduce((sum, entry) => sum + entry.pomodoroMs, 0);
-  activityHeatmapMeta.textContent = `Last 84 days: ${totalSessions} focus sessions, ${formatTrackedDuration(totalMs)} total focus time`;
+  activityHeatmapGrid.innerHTML = "";
+  for (const week of weeks) {
+    const weekColumn = document.createElement("div");
+    weekColumn.className = "activity-week-column";
+    weekColumn.dataset.week = week.weekKey;
+    if (state.activitySelectionType === "week" && state.activitySelectionKey === week.weekKey) {
+      weekColumn.classList.add("is-active");
+    }
 
-  renderActivityBars(activityTimeGraph, graphSeries, "pomodoroMs", true);
-  renderActivityBars(activitySessionsGraph, graphSeries, "focusSessions", false);
+    for (const day of week.days) {
+      const level = heatmapLevel(day.focusSessions, maxSessions);
+      const dayCell = document.createElement("button");
+      dayCell.type = "button";
+      dayCell.className = `activity-day-cell level-${level}`;
+      dayCell.dataset.key = day.key;
+      dayCell.title = `${day.key}: ${day.focusSessions} sessions, ${Math.round(day.pomodoroMs / 60000)} min`;
+      if (state.activitySelectionType === "day" && state.activitySelectionKey === day.key) {
+        dayCell.classList.add("is-active");
+      }
+      weekColumn.appendChild(dayCell);
+    }
+
+    activityHeatmapGrid.appendChild(weekColumn);
+  }
+
+  const totalSessions = allDays.reduce((sum, entry) => sum + entry.focusSessions, 0);
+  const totalMs = allDays.reduce((sum, entry) => sum + entry.pomodoroMs, 0);
+  activityHeatmapMeta.textContent = `Last 3 months: ${totalSessions} sessions, ${formatTrackedDuration(totalMs)} focus time`;
+
+  activityDashboardCard.classList.toggle("is-lifetime", state.activitySelectionType === "lifetime");
+
+  const selected = currentSelectionSeries(weeks);
+  const selectionSessions = selected.points.reduce((sum, point) => sum + (point.focusSessions || 0), 0);
+  const selectionMs = selected.points.reduce((sum, point) => sum + (point.pomodoroMs || 0), 0);
+  activitySelectionLabel.textContent = `${selected.label} - ${selectionSessions} sessions - ${formatTrackedDuration(selectionMs)}`;
+
+  renderMetricChart(
+    focusSessionsChart,
+    selected.points,
+    "focusSessions",
+    "Sessions",
+    "Time",
+    "bar-sessions"
+  );
+
+  const timePoints = selected.points.map((point) => ({
+    ...point,
+    pomodoroMinutes: Math.round((point.pomodoroMs || 0) / 60000),
+  }));
+  renderMetricChart(
+    focusTimeChart,
+    timePoints,
+    "pomodoroMinutes",
+    "Minutes",
+    "Time",
+    "bar-time"
+  );
 }
 
 function addUsageElapsed(nowMs = Date.now()) {
@@ -1088,16 +1343,6 @@ function updateUI() {
   muteBtn.setAttribute("title", state.muted ? "Unmute alarm" : "Mute alarm");
   muteBtn.setAttribute("aria-pressed", state.muted ? "true" : "false");
 
-  const stats = aggregateStats(state.statsRange);
-  sessionsStatLabel.textContent = stats.sessionsLabel;
-  timeStatLabel.textContent = stats.timeLabel;
-  focusSessionsCount.textContent = stats.sessions.toString();
-  totalPomodoroTime.textContent = formatTrackedDuration(stats.pomodoroMs);
-
-  todayStatsBtn.classList.toggle("is-active", state.statsRange === "today");
-  weeklyStatsBtn.classList.toggle("is-active", state.statsRange === "weekly");
-  lifetimeStatsBtn.classList.toggle("is-active", state.statsRange === "lifetime");
-
   document.body.dataset.session = state.mode;
 
   renderActivityDashboard();
@@ -1444,11 +1689,45 @@ settingsBtn.addEventListener("click", () => setSettingsPanelState(settingsPanel.
 
 resetBtn.addEventListener("click", () => resetTimer());
 pipBtn.addEventListener("click", () => togglePiP());
-todayStatsBtn.addEventListener("click", () => setStatsRange("today"));
-weeklyStatsBtn.addEventListener("click", () => setStatsRange("weekly"));
-lifetimeStatsBtn.addEventListener("click", () => setStatsRange("lifetime"));
-resetLifetimeBtn.addEventListener("click", () => resetLifetimeStats());
 activityToggleBtn.addEventListener("click", () => setActivityPanelState(!state.activityPanelOpen));
+
+activityMonthRow.addEventListener("click", (event) => {
+  const monthButton = event.target.closest(".activity-month-btn");
+  if (!monthButton) {
+    return;
+  }
+
+  event.stopPropagation();
+  setActivitySelection("month", monthButton.dataset.month || "");
+});
+
+activityHeatmapGrid.addEventListener("click", (event) => {
+  const dayButton = event.target.closest(".activity-day-cell");
+  if (dayButton) {
+    event.stopPropagation();
+    setActivitySelection("day", dayButton.dataset.key || "");
+    return;
+  }
+
+  const weekColumn = event.target.closest(".activity-week-column");
+  if (weekColumn) {
+    event.stopPropagation();
+    setActivitySelection("week", weekColumn.dataset.week || "");
+  }
+});
+
+activityDashboardCard.addEventListener("click", (event) => {
+  if (
+    event.target.closest(".activity-day-cell") ||
+    event.target.closest(".activity-week-column") ||
+    event.target.closest(".activity-month-btn")
+  ) {
+    return;
+  }
+
+  setActivitySelection("lifetime");
+});
+
 googleSignInBtn.addEventListener("click", (event) => {
   event.stopPropagation();
 
@@ -1595,7 +1874,6 @@ applySettings(true);
 setSettingsPanelState(false);
 setBackgroundTheme(localStorage.getItem("pomodoroBackgroundTheme") || "solid");
 loadUsageStats();
-loadStatsRangePreference();
 loadPiPStickyPreference();
 loadActivityPanelPreference();
 setupFirebaseAuth();

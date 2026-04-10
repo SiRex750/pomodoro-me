@@ -392,18 +392,18 @@ input[type="number"]::-webkit-inner-spin-button {
   margin-top: 0.85rem;
   display: grid;
   grid-template-columns: 1fr;
-  gap: 0.55rem;
+  gap: 0.5rem;
 }
 
 .activity-toggle {
   width: 100%;
-  min-height: 42px;
+  min-height: 40px;
   border-radius: 999px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.6rem 0.9rem;
-  font-weight: 700;
+  padding: 0.55rem 0.9rem;
+  font-weight: 600;
 }
 
 .activity-toggle i {
@@ -412,87 +412,98 @@ input[type="number"]::-webkit-inner-spin-button {
 
 .activity-panel {
   display: grid;
-  gap: 0.55rem;
-}
-
-.stats-summary {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.55rem;
-}
-
-.stats-toolbar {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.45rem;
-}
-
-.stats-toggle,
-.stats-reset {
-  min-height: 36px;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  padding: 0.45rem 0.5rem;
-}
-
-.stats-toggle.is-active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-
-.stats-reset {
-  background: color-mix(in srgb, var(--btn-bg) 60%, #451f25 40%);
-}
-
-.stat-card {
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--panel) 75%, transparent);
-  padding: 0.7rem 0.8rem;
+  gap: 0.5rem;
 }
 
 .activity-card {
   border: 1px solid var(--line);
   border-radius: 12px;
-  background: color-mix(in srgb, var(--panel) 75%, transparent);
+  background: color-mix(in srgb, var(--panel) 68%, transparent);
   padding: 0.7rem 0.8rem;
+}
+
+.activity-dashboard-card {
+  cursor: pointer;
+}
+
+.activity-dashboard-card.is-lifetime {
+  border-color: color-mix(in srgb, var(--accent) 65%, var(--line));
+}
+
+.activity-month-row {
+  margin-top: 0.35rem;
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.activity-month-btn {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-soft);
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  font: inherit;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+
+.activity-month-btn.is-active {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
 }
 
 .activity-heatmap-grid {
   margin-top: 0.5rem;
-  display: grid;
-  grid-template-rows: repeat(7, 12px);
-  grid-auto-flow: column;
-  grid-auto-columns: 12px;
-  gap: 3px;
+  display: flex;
+  gap: 4px;
   overflow-x: auto;
-  padding-bottom: 0.2rem;
+  padding-bottom: 0.3rem;
 }
 
-.activity-cell {
+.activity-week-column {
+  display: grid;
+  grid-template-rows: repeat(7, 12px);
+  gap: 3px;
+  padding: 2px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.activity-week-column.is-active {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
+}
+
+.activity-day-cell {
   width: 12px;
   height: 12px;
   border-radius: 3px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.08);
+  padding: 0;
+  cursor: pointer;
 }
 
-.activity-cell.level-1 {
+.activity-day-cell.level-1 {
   background: #6f1f22;
 }
 
-.activity-cell.level-2 {
+.activity-day-cell.level-2 {
   background: #8f2a2f;
 }
 
-.activity-cell.level-3 {
+.activity-day-cell.level-3 {
   background: #b8363c;
 }
 
-.activity-cell.level-4 {
+.activity-day-cell.level-4 {
   background: #dc4e55;
+}
+
+.activity-day-cell.is-active {
+  outline: 1px solid color-mix(in srgb, var(--accent) 70%, white 30%);
+  outline-offset: 1px;
 }
 
 .activity-meta {
@@ -501,29 +512,38 @@ input[type="number"]::-webkit-inner-spin-button {
   font-size: 0.78rem;
 }
 
-.activity-graphs {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.55rem;
+.activity-selection-label {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 600;
 }
 
-.activity-bars {
-  margin-top: 0.55rem;
-  min-height: 120px;
-  display: grid;
-  grid-template-columns: repeat(14, minmax(0, 1fr));
-  align-items: end;
-  gap: 0.24rem;
+.activity-chart {
+  margin-top: 0.45rem;
+  width: 100%;
+  height: 180px;
+  display: block;
 }
 
-.activity-bar {
-  border-radius: 7px 7px 3px 3px;
-  background: linear-gradient(180deg, rgba(245, 182, 193, 0.96), rgba(183, 67, 79, 0.82));
-  min-height: 6px;
+.activity-chart .axis-line,
+.activity-chart .tick-line {
+  stroke: rgba(255, 255, 255, 0.36);
+  stroke-width: 1;
 }
 
-.activity-bar-time {
-  background: linear-gradient(180deg, rgba(214, 225, 255, 0.94), rgba(84, 131, 214, 0.88));
+.activity-chart .tick-label,
+.activity-chart .axis-label {
+  fill: rgba(247, 238, 242, 0.78);
+  font-size: 11px;
+}
+
+.activity-chart .bar-sessions {
+  fill: rgba(236, 142, 160, 0.88);
+}
+
+.activity-chart .bar-time {
+  fill: rgba(143, 181, 241, 0.9);
 }
 
 .stat-label {
@@ -741,18 +761,6 @@ body[data-bgset="marble"][data-session="longBreak"] {
   }
 
   .stats {
-    grid-template-columns: 1fr;
-  }
-
-  .stats-summary {
-    grid-template-columns: 1fr;
-  }
-
-  .stats-toolbar {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .activity-graphs {
     grid-template-columns: 1fr;
   }
 

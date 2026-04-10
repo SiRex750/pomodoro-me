@@ -101,40 +101,18 @@
         </button>
 
         <div id="activityPanel" class="activity-panel" hidden>
-          <div class="stats-toolbar" role="group" aria-label="Stats range">
-            <button id="todayStatsBtn" class="btn stats-toggle is-active" type="button" data-range="today">Today</button>
-            <button id="weeklyStatsBtn" class="btn stats-toggle" type="button" data-range="weekly">Weekly</button>
-            <button id="lifetimeStatsBtn" class="btn stats-toggle" type="button" data-range="lifetime">Lifetime</button>
-            <button id="resetLifetimeBtn" class="btn stats-reset" type="button">Reset Lifetime</button>
-          </div>
-
-          <div class="stats-summary">
-            <article class="stat-card">
-              <p id="sessionsStatLabel" class="stat-label">Today Focus Sessions</p>
-              <p id="focusSessionsCount" class="stat-value">0</p>
-            </article>
-            <article class="stat-card">
-              <p id="timeStatLabel" class="stat-label">Today Pomodoro Time</p>
-              <p id="totalPomodoroTime" class="stat-value">00:00:00</p>
-            </article>
-          </div>
-
-          <article class="activity-card" aria-label="Focus activity heatmap">
+          <article id="activityDashboardCard" class="activity-card activity-dashboard-card" aria-label="Focus activity heatmap">
             <p class="stat-label">Focus Activity</p>
+            <div id="activityMonthRow" class="activity-month-row" aria-label="Month shortcuts"></div>
             <div id="activityHeatmapGrid" class="activity-heatmap-grid"></div>
             <p id="activityHeatmapMeta" class="activity-meta"></p>
           </article>
 
-          <div class="activity-graphs">
-            <article class="activity-card" aria-label="Pomodoro time graph">
-              <p class="stat-label">Pomodoro Time (Last 14 Days)</p>
-              <div id="activityTimeGraph" class="activity-bars"></div>
-            </article>
-            <article class="activity-card" aria-label="Focus sessions graph">
-              <p class="stat-label">Focus Sessions (Last 14 Days)</p>
-              <div id="activitySessionsGraph" class="activity-bars"></div>
-            </article>
-          </div>
+          <article class="activity-card activity-graph-card" aria-label="Activity graphs">
+            <p id="activitySelectionLabel" class="activity-selection-label">Lifetime</p>
+            <svg id="focusSessionsChart" class="activity-chart" viewBox="0 0 600 220" preserveAspectRatio="none"></svg>
+            <svg id="focusTimeChart" class="activity-chart" viewBox="0 0 600 220" preserveAspectRatio="none"></svg>
+          </article>
         </div>
       </section>
 
