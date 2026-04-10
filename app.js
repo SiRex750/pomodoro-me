@@ -395,15 +395,43 @@ function setActivitySelection(type, key = "") {
 
 function pointsForMonth(monthKey) {
   const [year, month] = monthKey.split("-").map(Number);
-  const start = new Date(year, month - 1, 1);
-  const end = new Date(year, month, 0);
+  const monthStart = new Date(year, month - 1, 1);
+  const monthEnd = new Date(year, month, 0);
+  const firstWeekStart = startOfWeekSunday(monthStart);
+  const lastWeekStart = startOfWeekSunday(monthEnd);
+
   const points = [];
-  for (let day = 1; day <= end.getDate(); day += 1) {
-    const current = new Date(year, month - 1, day);
-    const key = toDateKey(current);
-    points.push({ label: String(day), key, ...dailyStatsForKey(key) });
+
+  let weekIndex = 1;
+  for (let cursor = new Date(firstWeekStart); cursor <= lastWeekStart; cursor.setDate(cursor.getDate() + 7)) {
+    let sessions = 0;
+    let pomodoroMs = 0;
+    for (let dayOffset = 0; dayOffset < 7; dayOffset += 1) {
+      const current = new Date(cursor);
+      current.setDate(cursor.getDate() + dayOffset);
+      if (current.getMonth() !== monthStart.getMonth()) {
+        continue;
+      }
+
+      const dayStats = dailyStatsForKey(toDateKey(current));
+      sessions += dayStats.focusSessions;
+      pomodoroMs += dayStats.pomodoroMs;
+    }
+
+    points.push({
+      label: `W${weekIndex}`,
+      key: `${monthKey}-W${weekIndex}`,
+      focusSessions: sessions,
+      pomodoroMs,
+    });
+    weekIndex += 1;
   }
-  return { points, label: `${start.toLocaleString(undefined, { month: "long", year: "numeric" })}` };
+
+  return {
+    points,
+    label: `${monthStart.toLocaleString(undefined, { month: "long", year: "numeric" })}`,
+    xAxisTitle: "Weeks",
+  };
 }
 
 function pointsForWeek(weekKey, months) {
@@ -423,14 +451,26 @@ function pointsForWeek(weekKey, months) {
   const label = days.length
     ? `Week of ${humanDay(days[0].key)}`
     : "Week";
-  return { points, label };
+  return { points, label, xAxisTitle: "Days of Week" };
 }
 
 function pointsForDay(dayKey) {
   const entry = dailyStatsForKey(dayKey);
+  const points = Array.from({ length: 24 }, (_, hour) => ({
+    label: `${String(hour).padStart(2, "0")}:00`,
+    key: `${dayKey}T${String(hour).padStart(2, "0")}`,
+    focusSessions: 0,
+    pomodoroMs: 0,
+  }));
+
+  // We currently persist day-level totals, so we place totals at noon for hourly charting.
+  points[12].focusSessions = entry.focusSessions;
+  points[12].pomodoroMs = entry.pomodoroMs;
+
   return {
-    points: [{ label: humanDay(dayKey), key: dayKey, ...entry }],
+    points,
     label: humanDay(dayKey),
+    xAxisTitle: "Hours",
   };
 }
 
@@ -455,7 +495,7 @@ function pointsForLifetime() {
       date.setMonth(date.getMonth() - i, 1);
       fallback.push({ label: date.toLocaleString(undefined, { month: "short" }), focusSessions: 0, pomodoroMs: 0 });
     }
-    return { points: fallback, label: "Lifetime" };
+    return { points: fallback, label: "Lifetime", xAxisTitle: "Months" };
   }
 
   const points = Array.from(monthMap.entries()).map(([monthKey, values]) => ({
@@ -465,7 +505,7 @@ function pointsForLifetime() {
     pomodoroMs: values.pomodoroMs,
   }));
 
-  return { points, label: "Lifetime" };
+  return { points, label: "Lifetime", xAxisTitle: "Months" };
 }
 
 function currentSelectionSeries(months) {
@@ -626,6 +666,20 @@ function renderActivityDashboard() {
     weeksWrap.className = "activity-month-weeks";
 
     for (const week of month.weeks) {
+      const weekStack = document.createElement("div");
+      weekStack.className = "activity-week-stack";
+      weekStack.dataset.week = week.weekKey;
+      if (state.activitySelectionType === "week" && state.activitySelectionKey === week.weekKey) {
+        weekStack.classList.add("is-active");
+      }
+
+      const weekTab = document.createElement("button");
+      weekTab.type = "button";
+      weekTab.className = "activity-week-tab";
+      weekTab.dataset.week = week.weekKey;
+      weekTab.title = "Show week stats";
+      weekStack.appendChild(weekTab);
+
       const weekColumn = document.createElement("div");
       weekColumn.className = "activity-week-column";
       weekColumn.dataset.week = week.weekKey;
@@ -653,7 +707,8 @@ function renderActivityDashboard() {
         weekColumn.appendChild(dayCell);
       }
 
-      weeksWrap.appendChild(weekColumn);
+      weekStack.appendChild(weekColumn);
+      weeksWrap.appendChild(weekStack);
     }
 
     monthPanel.appendChild(weeksWrap);
@@ -676,7 +731,7 @@ function renderActivityDashboard() {
     selected.points,
     "focusSessions",
     "Sessions",
-    "Time",
+    selected.xAxisTitle || "Time",
     "bar-sessions"
   );
 
@@ -689,7 +744,7 @@ function renderActivityDashboard() {
     timePoints,
     "pomodoroMinutes",
     "Minutes",
-    "Time",
+    selected.xAxisTitle || "Time",
     "bar-time"
   );
 }
@@ -1709,6 +1764,13 @@ activityMonthsGrid.addEventListener("click", (event) => {
     return;
   }
 
+  const weekTab = event.target.closest(".activity-week-tab");
+  if (weekTab) {
+    event.stopPropagation();
+    setActivitySelection("week", weekTab.dataset.week || "");
+    return;
+  }
+
   const dayButton = event.target.closest(".activity-day-cell");
   if (dayButton) {
     event.stopPropagation();
@@ -1727,6 +1789,7 @@ activityDashboardCard.addEventListener("click", (event) => {
   if (
     event.target.closest(".activity-day-cell") ||
     event.target.closest(".activity-week-column") ||
+    event.target.closest(".activity-week-tab") ||
     event.target.closest(".activity-month-btn")
   ) {
     return;
