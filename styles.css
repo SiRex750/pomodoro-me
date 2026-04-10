@@ -89,11 +89,7 @@ body::before {
   position: fixed;
   top: 1rem;
   right: 1rem;
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  flex-direction: column;
-  gap: 0.45rem;
+  display: block;
   z-index: 20;
 }
 
@@ -101,25 +97,58 @@ body::before {
   width: 46px;
   height: 46px;
   border-radius: 999px;
-  display: grid;
-  place-items: center;
+  display: block;
   padding: 0;
   border-color: color-mix(in srgb, var(--line) 72%, #fff 28%);
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
   overflow: hidden;
+  position: relative;
 }
 
 .auth-icon-btn i {
   font-size: 1.2rem;
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
 }
 
 .auth-avatar {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
+.auth-sync-spinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  margin-top: -8px;
+  margin-left: -8px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.38);
+  border-top-color: rgba(255, 255, 255, 0.95);
+  animation: auth-spin 650ms linear infinite;
+}
+
+.auth-icon-btn.is-syncing {
+  filter: grayscale(1) brightness(0.86);
+  cursor: wait;
+}
+
+.auth-icon-btn.is-syncing .auth-avatar,
+.auth-icon-btn.is-syncing i {
+  opacity: 0.55;
+}
+
 .auth-menu {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  right: 0;
   min-width: 220px;
   padding: 0.7rem;
   border: 1px solid var(--line);
@@ -139,6 +168,13 @@ body::before {
   color: var(--ink-soft);
   font-size: 0.78rem;
   word-break: break-word;
+}
+
+.auth-menu-sync-status {
+  margin: 0 0 0.55rem;
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+  min-height: 1em;
 }
 
 .auth-menu-signout {
@@ -178,11 +214,7 @@ body::before {
 }
 
 .auth-panel {
-  margin-top: 0.85rem;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--panel) 65%, transparent);
-  padding: 0.7rem 0.8rem;
+  display: none;
 }
 
 .auth-hint {
@@ -620,7 +652,6 @@ body[data-bgset="marble"][data-session="longBreak"] {
   .auth-fab {
     top: 0.75rem;
     right: 0.75rem;
-    gap: 0.35rem;
   }
 
   .auth-icon-btn {
@@ -647,5 +678,14 @@ body[data-bgset="marble"][data-session="longBreak"] {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes auth-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
   }
 }

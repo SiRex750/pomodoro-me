@@ -31,9 +31,11 @@ const resetLifetimeBtn = document.getElementById("resetLifetimeBtn");
 const googleSignInBtn = document.getElementById("googleSignInBtn");
 const authProviderIcon = document.getElementById("authProviderIcon");
 const authAvatar = document.getElementById("authAvatar");
+const authSyncSpinner = document.getElementById("authSyncSpinner");
 const authMenu = document.getElementById("authMenu");
 const authMenuName = document.getElementById("authMenuName");
 const authMenuEmail = document.getElementById("authMenuEmail");
+const authMenuSyncStatus = document.getElementById("authMenuSyncStatus");
 const signOutBtn = document.getElementById("signOutBtn");
 const authStatus = document.getElementById("authStatus");
 const cloudSyncStatus = document.getElementById("cloudSyncStatus");
@@ -123,12 +125,20 @@ const state = {
   cloudSyncInFlight: false,
   lastCloudSyncAt: 0,
   authMenuOpen: false,
+  authSyncing: false,
 };
 
 function setAuthMenuState(open) {
   state.authMenuOpen = open;
   authMenu.hidden = !open;
   googleSignInBtn.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+function setAuthSyncing(isSyncing) {
+  state.authSyncing = isSyncing;
+  googleSignInBtn.classList.toggle("is-syncing", isSyncing);
+  googleSignInBtn.setAttribute("aria-busy", isSyncing ? "true" : "false");
+  authSyncSpinner.hidden = !isSyncing;
 }
 
 function todayKey() {
@@ -386,6 +396,7 @@ function updateAuthUI() {
     authAvatar.removeAttribute("src");
     authMenuName.textContent = "Not signed in";
     authMenuEmail.textContent = "";
+    authMenuSyncStatus.textContent = "";
     signOutBtn.hidden = true;
     setAuthMenuState(false);
     return;
@@ -403,6 +414,7 @@ function updateAuthUI() {
     authAvatar.removeAttribute("src");
     authMenuName.textContent = "Not signed in";
     authMenuEmail.textContent = "";
+    authMenuSyncStatus.textContent = "";
     signOutBtn.hidden = true;
     setAuthMenuState(false);
     return;
@@ -410,7 +422,7 @@ function updateAuthUI() {
 
   authStatus.textContent = `Signed in as ${state.currentUser.displayName || state.currentUser.email || "Google user"}`;
   googleSignInBtn.hidden = false;
-  googleSignInBtn.disabled = false;
+  googleSignInBtn.disabled = state.authSyncing;
   googleSignInBtn.setAttribute("aria-label", "Open account menu");
   googleSignInBtn.setAttribute("title", "Open account menu");
   signOutBtn.hidden = false;
@@ -434,7 +446,11 @@ function updateAuthUI() {
 }
 
 function setCloudSyncStatus(message) {
-  cloudSyncStatus.textContent = message;
+  if (cloudSyncStatus) {
+    cloudSyncStatus.textContent = message;
+  }
+
+  authMenuSyncStatus.textContent = message || "";
 }
 
 async function pullStatsFromCloud() {
@@ -476,6 +492,7 @@ async function pushStatsToCloud() {
   }
 
   state.cloudSyncInFlight = true;
+  setAuthSyncing(true);
   try {
     const payload = {
       version: STATS_DOC_VERSION,
@@ -494,6 +511,8 @@ async function pushStatsToCloud() {
     setCloudSyncStatus("Cloud sync failed. Will retry on next update.");
   } finally {
     state.cloudSyncInFlight = false;
+    setAuthSyncing(false);
+    updateAuthUI();
   }
 }
 
@@ -520,8 +539,15 @@ async function signInWithGoogle() {
     return;
   }
 
+  setAuthSyncing(true);
   const provider = new firebase.auth.GoogleAuthProvider();
-  await state.firebaseAuth.signInWithPopup(provider);
+  try {
+    await state.firebaseAuth.signInWithPopup(provider);
+  } catch (error) {
+    setAuthSyncing(false);
+    updateAuthUI();
+    throw error;
+  }
 }
 
 async function signOutGoogle() {
@@ -530,6 +556,7 @@ async function signOutGoogle() {
   }
 
   setAuthMenuState(false);
+  setAuthSyncing(true);
   await state.firebaseAuth.signOut();
 }
 
@@ -554,17 +581,26 @@ function setupFirebaseAuth() {
       state.currentUser = user;
       updateAuthUI();
       if (!user) {
+        setAuthSyncing(false);
         setCloudSyncStatus("");
+        updateAuthUI();
         return;
       }
 
+      setAuthSyncing(true);
       setCloudSyncStatus("Signed in. Syncing stats...");
-      await pullStatsFromCloud();
-      scheduleCloudSync(true);
-      updateUI();
+      try {
+        await pullStatsFromCloud();
+        scheduleCloudSync(true);
+        updateUI();
+      } finally {
+        setAuthSyncing(false);
+        updateAuthUI();
+      }
     });
   } catch (error) {
     state.firebaseReady = false;
+    setAuthSyncing(false);
     updateAuthUI();
     setCloudSyncStatus("Firebase setup failed. Check config values.");
   }

@@ -21,10 +21,12 @@
       <button id="googleSignInBtn" class="btn auth-icon-btn" type="button" aria-label="Sign in with Google" title="Sign in with Google">
         <i id="authProviderIcon" class="ri-google-fill" aria-hidden="true"></i>
         <img id="authAvatar" class="auth-avatar" alt="Account profile" hidden />
+        <span id="authSyncSpinner" class="auth-sync-spinner" hidden aria-hidden="true"></span>
       </button>
       <div id="authMenu" class="auth-menu" hidden>
         <p id="authMenuName" class="auth-menu-name">Not signed in</p>
         <p id="authMenuEmail" class="auth-menu-email"></p>
+        <p id="authMenuSyncStatus" class="auth-menu-sync-status"></p>
         <button id="signOutBtn" class="btn auth-menu-signout" type="button">Sign out</button>
       </div>
     </div>
